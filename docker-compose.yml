@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: tg_bot
+    env_file:
+      - .env
+    volumes:
+      - ./bot:/app
+    restart: always
+    networks:
+      - gecko_net
+
+networks:
+  gecko_net:
+    external: true
+    name: gecko_net

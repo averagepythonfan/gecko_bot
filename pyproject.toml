@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "gecko-bot"
+version = "0.1.0"
+description = "Telegram Bot for crypto stuff."
+authors = ["averagepythonfan <djonvorobei@bk.ru>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[tool.poetry.group.fastapi.dependencies]
+fastapi = "^0.95.0"
+uvicorn = "^0.21.1"
+aiohttp = "^3.8.4"
+
+
+[tool.poetry.group.bot.dependencies]
+aiogram = "3.0.0b7"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
