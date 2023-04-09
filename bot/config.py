@@ -1,5 +1,5 @@
 import os
 
 TOKEN: str = os.getenv('TOKEN')
-GECKONET: str = os.getenv('GECKONET')
+FASTAPI: str = os.getenv('FASTAPI')
 ADMIN: int = int(os.getenv('ADMIN'))

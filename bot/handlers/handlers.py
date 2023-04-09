@@ -1,7 +1,7 @@
 import aiohttp
 from aiogram import Router, types
 from aiogram.filters import Command
-from config import GECKONET
+from config import ADMIN, FASTAPI
 
 
 __all__ = [
@@ -19,13 +19,42 @@ async def help_command(message: types.Message):
 
 async def healthcheck_fastapi_command(message: types.Message):
     ''' '''
+    if message.from_user.id == ADMIN:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f'http://{FASTAPI}:80/healthcheck') as resp:
+                text = await resp.text()
+        await message.reply(text=text)
+
+async def update_other(message: types.Message):
+    '''Update coin and vs_currency data'''
     async with aiohttp.ClientSession() as session:
-        async with session.get(f'http://{GECKONET}:80/healthcheck') as resp:
+        async with session.get(f'http://{FASTAPI}:80/other') as resp:
             text = await resp.text()
     await message.reply(text=text)
 
+
+async def check_pair_command(message: types.Message):
+    '''Check if pair exist.'''
+
+    pair = message.text[7:].split('-')
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+
+    json_data = {
+        'coin_id': pair[0],
+        'vs_currency': pair[1],
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post('http://172.19.0.3/other/exist', headers=headers, json=json_data) as resp:
+            text = await resp.json()
+    await message.reply(text=text['message'])
 
 
 def register_message_handlers(router: Router):
     router.message.register(help_command, Command(commands=['help']))
     router.message.register(healthcheck_fastapi_command, Command(commands=['fastapi']))
+    router.message.register(update_other, Command(commands=['update']))
+    router.message.register(check_pair_command, Command(commands='check'))
