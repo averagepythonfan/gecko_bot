@@ -1,3 +1,5 @@
 .env
 /bot/__pycache__
 /bot/handlers/__pycache__
+/fastapi/__pycache__
+/mongo
