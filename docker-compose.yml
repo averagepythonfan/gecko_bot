@@ -1,5 +1,18 @@
 version: '3.9'
 services:
+
+  fastapi_server:
+    build:
+      context: .
+      dockerfile: fastapi/Dockerfile
+    container_name: fastapi
+    env_file:
+      - .env
+    volumes:
+      - ./fastapi:/app
+    networks:
+      - gecko_net
+
   bot:
     build:
       context: .
@@ -9,6 +22,8 @@ services:
       - .env
     volumes:
       - ./bot:/app
+    depends_on:
+      - fastapi_server
     restart: always
     networks:
       - gecko_net
