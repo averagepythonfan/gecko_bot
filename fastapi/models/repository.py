@@ -3,7 +3,7 @@ from mongodb import users, pairs, other
 
 __all__ = [
     'Other',
-    'User',
+    'Users',
     'Pairs'
 ]
 
@@ -31,13 +31,15 @@ class Users:
 
 class Other:
     '''Class for coins and currencies aggregation.
-
     It has two static methods: for update and validation pair.
     '''
 
     @staticmethod
     async def update():
-        '''Update supported vs_currencies and coins list'''
+        '''Update supported vs_currencies and coins list.
+        
+        Returns an inserted id after success request,
+        otherwise returns None.'''
 
         headers = {
             'accept': 'application/json',
@@ -48,21 +50,25 @@ class Other:
             'coins_list': 'https://api.coingecko.com/api/v3/coins/list'
         }
         
-        async with aiohttp.ClientSession() as session:
+        try:
+            async with aiohttp.ClientSession() as session:
 
-            for title, url in data.items():
-                async with session.get(url, headers=headers) as resp:
-                    response = {'name': title, 'data': await resp.json()}
-                    result = await other.insert_one(response)
-        
-        return result.inserted_id
+                for title, url in data.items():
+                    async with session.get(url, headers=headers) as resp:
+                        response = {'name': title, 'data': await resp.json()}
+                        result = await other.insert_one(response)
+            
+            return result.inserted_id
+
+        except Exception:
+            return None
     
     @staticmethod
     async def pair_existence(pair: list) -> dict | str:
         '''Check if pair exist. Returns boolean values, or index of error:
 
-        :return: 401 - Wrong vs_currency.
-        :return: 402 - Wrong coin.
+        :return: 432 - Wrong vs_currency.
+        :return: 433 - Wrong coin.
         :return: 200 - Everything is correct.
         '''
 
@@ -78,7 +84,7 @@ class Other:
         if vs_currency:
             data['vs_currency'] = True
         else:
-            return 401
+            return 432
 
         coin = await other.find_one(
             {'name': 'coins_list',
@@ -91,7 +97,7 @@ class Other:
         if coin:
             data['coin'] = True
         else:
-            return 402
+            return 433
 
         return 200
 
