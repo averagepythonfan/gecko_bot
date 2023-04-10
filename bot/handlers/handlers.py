@@ -4,11 +4,6 @@ from aiogram.filters import Command
 from config import ADMIN, FASTAPI
 
 
-__all__ = [
-    'register_message_handlers'
-]
-
-
 async def help_command(message: types.Message):
     '''Send help information to user'''
 
@@ -19,7 +14,7 @@ async def help_command(message: types.Message):
 
 async def healthcheck_fastapi_command(message: types.Message):
     ''' '''
-    if message.from_user.id == ADMIN:
+    if message.from_user.id == int(ADMIN):
         async with aiohttp.ClientSession() as session:
             async with session.get(f'http://{FASTAPI}:80/healthcheck') as resp:
                 text = await resp.text()
@@ -27,10 +22,11 @@ async def healthcheck_fastapi_command(message: types.Message):
 
 async def update_other(message: types.Message):
     '''Update coin and vs_currency data'''
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'http://{FASTAPI}:80/other') as resp:
-            text = await resp.text()
-    await message.reply(text=text)
+    if message.from_user.id == int(ADMIN):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f'http://{FASTAPI}:80/other') as resp:
+                text = await resp.text()
+        await message.reply(text=text)
 
 
 async def check_pair_command(message: types.Message):
@@ -48,9 +44,9 @@ async def check_pair_command(message: types.Message):
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post('http://172.19.0.3/other/exist', headers=headers, json=json_data) as resp:
+        async with session.post(f'http://{FASTAPI}/other/exist', headers=headers, json=json_data) as resp:
             text = await resp.json()
-    await message.reply(text=text['message'])
+    await message.reply(text=text['detail'])
 
 
 def register_message_handlers(router: Router):
