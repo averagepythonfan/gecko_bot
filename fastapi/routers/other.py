@@ -8,20 +8,23 @@ router = APIRouter(
 
 @router.get('/update')
 async def update_other():
-    '''Update coin and vs_currency data.'''
+    '''Update supported vs_currencies and coins list.
+        
+    Returns an inserted id after success request,
+    otherwise returns None.'''
 
     result = await Other.update()
 
     if result:
         return {
             'response': 200,
-            'message': 'Successfull update',
+            'detail': 'Successfull update',
             'data': str(result)
         }
     else:
         return {
             'response': 401,
-            'message': 'Failed coin and vs_currencies data update'
+            'detail': 'Failed coin and vs_currencies data update'
         }
 
 
@@ -29,7 +32,11 @@ async def update_other():
 async def check_pair_existence(pair: Pair):
     '''Check if pair exist.
     
-    Accepts a Pair instance. Return json data with message.'''
+    Accepts a Pair instance. Return json data with message.
+
+    :return: 432 - Wrong vs_currency.
+    :return: 433 - Wrong coin.
+    :return: 200 - Everything is correct'''
 
     result = await Other.pair_existence([pair.coin_id, pair.vs_currency])
 
