@@ -49,8 +49,6 @@ class Other:
         :return: 433 - Wrong coin.
         :return: 200 - Everything is correct.'''
 
-        data = {'coin': False, 'vs_currency': False}
-
         vs_currency = await other.find_one(
             {'name': 'supported_vs_currencies',
              'data': {
@@ -58,9 +56,7 @@ class Other:
                 }
             }
         )
-        if vs_currency:
-            data['vs_currency'] = True
-        else:
+        if vs_currency is None:
             return 432
 
         coin = await other.find_one(
@@ -71,13 +67,18 @@ class Other:
                 }
             }
         )
-        if coin:
-            data['coin'] = True
-        else:
+        if coin is None:
             return 433
         
         return 200
 
+    @staticmethod
+    async def pair_in_database(coin_id: str, vs_currency: str):
+        res = await pairs.find_one({'pair_name': f'{coin_id}-{vs_currency}'})
+        if res:
+            return res
+        else:
+            return 433
 
 class Pairs:
     '''CRUD for pairs'''
@@ -116,11 +117,13 @@ class Pairs:
 
             return res.inserted_id
 
-
-    
     @staticmethod
-    async def get_pair(pair: Pair, days: int):
-        pass
+    async def get_pair(coin_id: str, vs_currency: str, days: int = 0):
+        result = await Other.pair_in_database(coin_id=coin_id, vs_currency=vs_currency)
+        if result == 433:
+            return result
+        else:
+            return result['data']['prices']
 
     @staticmethod
     async def delete_pair(pair: list):
