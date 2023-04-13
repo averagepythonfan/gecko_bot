@@ -1,31 +1,33 @@
 from fastapi import APIRouter, HTTPException
 from models import Other, Pair
 
+
 router = APIRouter(
     prefix='/other',
     tags=['Other']
 )
 
+
 @router.get('/update')
 async def update_other():
     '''Update supported vs_currencies and coins list.
         
-    Returns an inserted id after success request,
-    otherwise returns None.'''
+    :return: 200, successfull update,
+    :return: 438, data update error'''
 
     result = await Other.update()
 
     if result:
         return {
             'response': 200,
-            'detail': 'Successfull update',
+            'detail': 'successfull update',
             'data': str(result)
         }
     else:
-        return {
-            'response': 401,
-            'detail': 'Failed coin and vs_currencies data update'
-        }
+        raise HTTPException(
+            status_code=438,
+            detail='failed coin and vs_currencies data update'
+        )
 
 
 @router.post('/check')
@@ -34,26 +36,20 @@ async def check_pair_existence(pair: Pair):
     
     Accepts a Pair instance. Return json data with message.
 
-    :return: 432 - Wrong vs_currency.
-    :return: 433 - Wrong coin.
-    :return: 200 - Everything is correct'''
+    :return: 200, everything is correct,
+    :return: 432, vs_currency not valid: {vs_currency},
+    :return: 433, coin not valid: {pair.coin_id}'''
 
-    result = await Other.pair_existence([pair.coin_id, pair.vs_currency])
+    result = await Other.pair_existence(pair=pair)
 
-    if result == 200:
+    if result['code'] == 200:
         return {
             'status': 'success',
             'detail': 'valid pair'
         }
     
-    elif result == 432:
+    else:
         raise HTTPException(
-            status_code=432,
-            detail=f'vs_currency not valid: {pair.vs_currency}'
-        )
-    
-    elif result == 433:
-        raise HTTPException(
-            status_code=433,
-            detail=f'coin not valid: {pair.coin_id}'
+            status_code=result['code'],
+            detail=result['detail']
         )

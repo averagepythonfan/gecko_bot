@@ -2,7 +2,7 @@ import aiohttp
 import time
 from .misc import validate_user_data
 from mongodb import users, pairs, other
-from .models import Pair, User, UserResponse
+from .models import Pair, User
 from pymongo import ReturnDocument, DESCENDING
 from pymongo.results import DeleteResult, InsertOneResult
 
@@ -42,7 +42,7 @@ class Other:
             return None
     
     @staticmethod
-    async def pair_existence(pair: Pair) -> int:
+    async def pair_existence(pair: Pair) -> dict:
         '''Check if pair exist. Returns status code.
 
         :return: 432 - Wrong vs_currency.
@@ -57,7 +57,7 @@ class Other:
             }
         )
         if vs_currency is None:
-            return 432
+            return {'code': 432, 'detail': 'vs_currency is incorrect'}
 
         coin = await other.find_one(
             {'name': 'coins_list',
@@ -68,13 +68,23 @@ class Other:
             }
         )
         if coin is None:
-            return 433
+            return {'code': 433, 'detail': 'coin is incorrect'}
         
-        return 200
+        return {'code': 200, 'detail': 'pair is valid'}
 
     @staticmethod
-    async def pair_in_database(coin_id: str, vs_currency: str):
-        res = await pairs.find_one({'pair_name': f'{coin_id}-{vs_currency}'})
+    async def pair_in_database(coin_id: str, vs_currency: str, day: int = 7):
+        time_slice = -(day * 24)
+        res = await pairs.find_one(
+            {'pair_name': f'{coin_id}-{vs_currency}'},
+                {
+                    'data': {
+                        'prices': {'$slice': time_slice},
+                        'market_caps': {'$slice': 0},
+                        'total_volumes': {'$slice': 0}
+                            }
+                }
+            )
         if res:
             return res
         else:
@@ -126,7 +136,7 @@ class Pairs:
             return result['data']['prices']
 
     @staticmethod
-    async def delete_pair(pair: list):
+    async def delete_pair(pair: Pair):
         pass
 
 
@@ -164,10 +174,10 @@ class Users:
             return validate_user_data(res)
 
     @staticmethod
-    async def set_n_pairs(user: User):
+    async def set_n_pairs(user_id: int, n_pairs: int = 3):
         res = await users.find_one_and_update(
-            {'user_id': user.user_id},
-            {'$set': {'n_pairs': user.n_pairs}},
+            {'user_id': user_id},
+            {'$set': {'n_pairs': n_pairs}},
             return_document=ReturnDocument.AFTER
         )
         if res:
@@ -180,18 +190,31 @@ class Users:
             'detail': 'pair successfully added'
         }
 
-        res = await users.find_one({'user_id': user_id})
-        res_pair = await Other.pair_existence(pair=pair)
+        check_user = await users.find_one({'user_id': user_id})
+        check_pair = await Other.pair_existence(pair=pair)
 
-        if (res and res_pair == 200):
-            res_update =  await users.find_one_and_update({
-                {'user_id': user_id},
-                {'$push': {'pairs': f'{pair.coin_id}-{pair.vs_currency}'}}
-            })
-        elif res_pair != 200:
-            data['code'] = res_pair
-            data['detail'] = 'pair does not exist'
-        elif res is None:
+        if (check_user and check_pair['code'] == 200):
+            user_validated = validate_user_data(check_user)
+            if user_validated['n_pairs'] > len(user_validated['pairs']):
+                res = await users.find_one_and_update(
+                    {'user_id': user_id},
+                    {'$push': {'pairs': f'{pair.coin_id}-{pair.vs_currency}'}},
+                    return_document=ReturnDocument.AFTER
+                )
+                user_updated = validate_user_data(res)
+                data['detail'] = {
+                    'message': 'user and pair successfully validated and added',           
+                    'data': user_updated,
+                    'n_user_pairs': len(user_updated['pairs']),
+                    'n_pairs_left': user_updated['n_pairs'] - len(user_updated['pairs'])
+                }
+            else:
+                data['code'] = 439
+                data['detail'] = 'Pair limit is over'
+        elif check_pair != 200:
+            data['code'] = check_pair['code']
+            data['detail'] = check_pair['detail']
+        elif check_user is None:
             data['code'] = 435
             data['detail'] = 'user not found'
         return data
@@ -200,10 +223,13 @@ class Users:
     async def delete_users_pair(user_id: int, pair: str):
         data = {
             'code': 200,
-            'detail': 'pair successfully added'
+            'detail': 'pair successfully deleted'
         }
 
-        res = await users.find_one_and_update({'user_id': user_id}, {'$pull': {'pairs': pair}})
+        res = await users.find_one_and_update(
+            {'user_id': user_id},
+            {'$pull': {'pairs': pair}}
+        )
         if res is None:
             data['code'] = 437
             data['detail'] = 'pair not found'
@@ -214,4 +240,3 @@ class Users:
     async def delete_user(user_id: int):
         res: DeleteResult = await users.delete_one({'user_id': user_id})
         return res.raw_result
-    

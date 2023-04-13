@@ -65,14 +65,14 @@ async def get_user_data(user_id: int):
 
 
 @router.put('/set_n_pairs')
-async def set_n_pairs_for_user(user: User):
+async def set_n_pairs_for_user(user_id: int, n_pairs: int):
     '''Set number of pairs for user by id.
     
     Requires only id and n_pairs.
     :return: 200, updated user data
     :return: 436, setting n_pairs error'''
 
-    res = await Users.set_n_pairs(user=user)
+    res = await Users.set_n_pairs(user_id=user_id, n_pairs=n_pairs)
     if res:
         return {
             'status': 'success',
@@ -92,7 +92,8 @@ async def add_new_pair(user_id: int, pair: Pair):
     :return: 200, pair successfully added,
     :return: 432, vs_currency not valid: {vs_currency},
     :return: 433, coin not valid: {pair.coin_id},
-    :return: 435, user not found {user_id}'''
+    :return: 435, user not found {user_id}
+    :return: 439, n_pair limit is over'''
 
     res = await Users.add_pair(user_id=user_id, pair=pair)
     if res:
@@ -101,21 +102,10 @@ async def add_new_pair(user_id: int, pair: Pair):
                 'status': 'success',
                 'detail': res['detail']
             }
-        elif res['code'] == 432:
+        else:
             raise HTTPException(
-                status_code=432,
-                detail=f'vs_currency not valid: {pair.vs_currency}'
-            )
-        
-        elif res['code'] == 433:
-            raise HTTPException(
-                status_code=433,
-                detail=f'coin not valid: {pair.coin_id}'
-            )
-        elif res['code'] == 435:
-            raise HTTPException(
-                status_code=435,
-                detail=f'user not found: {user_id}'
+                status_code=res['code'],
+                detail=res['detail']
             )
 
 
@@ -126,7 +116,10 @@ async def delete_user_pair(user_id: int, pair: Pair):
     :return: 200, pair successfully deleted,
     :return: 437, pair not found'''
 
-    res = await Users.delete_users_pair(user_id=user_id, pair=pair)
+    res = await Users.delete_users_pair(
+        user_id=user_id,
+        pair=f'{pair.coin_id}-{pair.vs_currency}'
+    )
     if res['code'] == 200:
         return {
             'status': 'success',
