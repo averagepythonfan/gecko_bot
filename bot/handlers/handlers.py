@@ -2,55 +2,128 @@ import aiohttp
 from aiogram import Router, types
 from aiogram.filters import Command
 from config import ADMIN, FASTAPI
+from .misc import Entity
+from .client import Client
+from .help_command import help_str
 
 
 async def help_command(message: types.Message):
-    '''Send help information to user'''
+    '''Send help information to user and register him to database.'''
 
-    await message.reply('''
-        THIS IS A HELP COMMAND !
-    ''')
+    await Client.post(
+        entity=Entity.user.value,
+        path='/create',
+        json_data={
+            'user_id': message.from_user.id,
+            'user_name': message.from_user.username,
+            'n_pairs': 3,
+        }
+    )
+    await message.reply(text=help_str, parse_mode='HTML')
 
 
 async def healthcheck_fastapi_command(message: types.Message):
-    ''' '''
+    '''Check FastAPI server is running.'''
+
     if message.from_user.id == int(ADMIN):
         async with aiohttp.ClientSession() as session:
             async with session.get(f'http://{FASTAPI}:80/healthcheck') as resp:
                 text = await resp.text()
         await message.reply(text=text)
 
+
 async def update_other(message: types.Message):
     '''Update coin and vs_currency data'''
+
     if message.from_user.id == int(ADMIN):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f'http://{FASTAPI}:80/other') as resp:
-                text = await resp.text()
-        await message.reply(text=text)
+        resp = await Client.get(
+            entity=Entity.other.value,
+            path='/update'
+
+        )
+        await message.reply(text=str(resp))
 
 
-async def check_pair_command(message: types.Message):
+async def set_n_pair_for_user_command(message: types.Message):
+    '''Setting n_pair for user: ADMIN only'''
+
+    if message.from_user.id == int(ADMIN):
+        text = message.text[5:].split()
+
+        USER_ID = text[0]
+        N_PAIRS = text[1]
+
+        resp = await Client.put(
+            entity=Entity.user.value,
+            path=f'/{USER_ID}/set_n_pairs/{N_PAIRS}'
+        )
+
+        await message.reply(text=str(resp))
+
+
+async def add_pair_command(message: types.Message):
     '''Check if pair exist.'''
 
-    pair = message.text[7:].split('-')
-    headers = {
-        'accept': 'application/json',
-        'Content-Type': 'application/json',
-    }
+    text = message.text[5:].split('-')
 
-    json_data = {
-        'coin_id': pair[0],
-        'vs_currency': pair[1],
-    }
+    COIN = text[0]
+    VS_CURRENCY = text[1]
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(f'http://{FASTAPI}/other/exist', headers=headers, json=json_data) as resp:
-            text = await resp.json()
-    await message.reply(text=text['detail'])
+    resp = await Client.put(
+        entity=Entity.user.value,
+        path=f'/{message.from_user.id}/add_pair',
+        json_data={
+            'coin_id': COIN,
+            'vs_currency': VS_CURRENCY
+        }
+    )
+    await message.reply(text=str(resp))
 
 
-def register_message_handlers(router: Router):
-    router.message.register(help_command, Command(commands=['help']))
-    router.message.register(healthcheck_fastapi_command, Command(commands=['fastapi']))
+async def delete_pair_command(message: types.Message):
+    '''Delete user's pair'''
+
+    text = message.text[8:].split('-')
+
+    COIN = text[0]
+    VS_CURRENCY = text[1]
+
+    resp = await Client.delete(
+        entity=Entity.user.value,
+        path=f'/{message.from_user.id}/delete_pair',
+        json_data={
+            'coin_id': COIN,
+            'vs_currency': VS_CURRENCY
+        }
+    )
+    await message.reply(text=str(resp))
+
+
+async def my_status_command(message: types.Message):
+    '''Send user information about him.'''
+
+    resp = await Client.get(
+        entity=Entity.user.value,
+        path=f'/{message.from_user.id}'
+    )
+
+    await message.reply(
+        text=f"<b>USER ID</b> : <i>{resp['user_data']['user_id']}</i>\n"
+        f"<b>USER NAME</b> : <i>{resp['user_data']['user_name']}</i>\n"
+        f"<b>NUMBER OF PAIRS</b> : <i>{resp['user_data']['n_pairs']}</i>\n"
+        f"<b>PAIRS</b> : <i>{resp['user_data']['pairs']}</i>",
+        parse_mode='HTML')
+
+
+async def show_exchanges_command(message: types.Message):
+    pass
+
+
+def register_message_handlers(router: Router) -> None:
+    router.message.register(help_command, Command(commands=['help', 'start']))
+    router.message.register(healthcheck_fastapi_command, Command(commands=['healthcheck']))
     router.message.register(update_other, Command(commands=['update']))
-    router.message.register(check_pair_command, Command(commands='check'))
+    router.message.register(add_pair_command, Command(commands='add'))
+    router.message.register(delete_pair_command, Command(commands=['delete']))
+    router.message.register(set_n_pair_for_user_command, Command(commands=['set']))
+    router.message.register(my_status_command, Command(commands=['status']))
