@@ -20,7 +20,7 @@ async def create_user(user: User):
     if res:
         return {
             'status': 'success',
-            'detail': f'Inserted id: {res}'
+            'detail': f'Inserted: {res}'
         }
     else:
         raise HTTPException(
@@ -64,7 +64,7 @@ async def get_user_data(user_id: int):
         )
 
 
-@router.put('/set_n_pairs')
+@router.put('/{user_id}/set_n_pairs/{n_pairs}')
 async def set_n_pairs_for_user(user_id: int, n_pairs: int):
     '''Set number of pairs for user by id.
     
@@ -85,7 +85,7 @@ async def set_n_pairs_for_user(user_id: int, n_pairs: int):
         )
 
 
-@router.put('/add_pair/{user_id}')
+@router.put('/{user_id}/add_pair')
 async def add_new_pair(user_id: int, pair: Pair):
     '''Add pair to user data.
     
@@ -109,7 +109,7 @@ async def add_new_pair(user_id: int, pair: Pair):
             )
 
 
-@router.delete('/delete/pair/{user_id}')
+@router.delete('/{user_id}/delete_pair')
 async def delete_user_pair(user_id: int, pair: Pair):
     '''Delete user's pair by user_id and pair
     
@@ -132,7 +132,7 @@ async def delete_user_pair(user_id: int, pair: Pair):
         )
 
 
-@router.delete('/delete/{user_id}')
+@router.delete('/{user_id}/delete_user')
 async def delete_user(user_id: int):
     '''Delete user by id.
     

@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from .models import UserResponse
 from typing import List
 
 

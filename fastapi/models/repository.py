@@ -156,7 +156,7 @@ class Users:
                 'pairs': []
             }
             result: InsertOneResult = await users.insert_one(user_data)
-            return result.inserted_id
+            return result.acknowledged
 
     @staticmethod
     async def get_all_users():
