@@ -1,16 +1,25 @@
-import aiohttp
-import time
-from .misc import validate_user_data
-from mongodb import users, pairs, other
-from .models import Pair, User
-from pymongo import ReturnDocument, DESCENDING
-from pymongo.results import DeleteResult, InsertOneResult
-
 __all__ = [
     'Other',
     'Users',
     'Pairs'
 ]
+
+
+import aiohttp
+import time
+import os
+import logging
+import seaborn as sns
+from .misc import validate_user_data, send_pic
+from mongodb import users, pairs, other
+from .models import Pair, User
+from pymongo import ReturnDocument, DESCENDING
+from pymongo.results import DeleteResult, InsertOneResult
+from config import TOKEN
+
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class Other:
@@ -128,12 +137,50 @@ class Pairs:
             return res.inserted_id
 
     @staticmethod
-    async def get_pair(coin_id: str, vs_currency: str, days: int = 0):
-        result = await Other.pair_in_database(coin_id=coin_id, vs_currency=vs_currency)
+    async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
+        result = await Other.pair_in_database(coin_id=coin_id, vs_currency=vs_currency, day=day)
         if result == 433:
             return result
         else:
             return result['data']['prices']
+
+    @staticmethod
+    async def get_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
+        res = await users.find_one({'user_id': user_id})
+        if res:
+            pair = f'{coin_id}-{vs_currency}'
+            if pair in res['pairs']:
+                check_pair = await Other.pair_in_database(
+                    coin_id=coin_id,
+                    vs_currency=vs_currency,
+                    day=day
+                )
+                if check_pair != 433:
+                    prices = check_pair['data']['prices']
+                    plot = sns.lineplot(data=[el[1] for el in prices])
+                    plot.set(xticklabels=[],
+                             title=pair,
+                             ylabel='value',
+                             xlabel=f'last {day} days')
+                    fig = plot.get_figure()
+                    file_name = f'{user_id}-{int(time.time())}.jpeg'
+                    fig.savefig(file_name)
+
+                    url = f'https://api.telegram.org/bot{TOKEN}'
+                    f'/sendPhoto?chat_id={user_id}'
+                    f'&caption={coin_id.upper()}-{vs_currency.upper()}'
+
+                    response = await send_pic(file_name, url)
+                    os.remove(file_name)
+                    logger.info(f'user_id: {user_id}, pair: {coin_id}-{vs_currency}')
+                    return {'code': 200, 'detail': response }
+                else:
+                    return {'code': 433, 'detail': 'pair incorrect'}
+            else:
+                return {'code': 437, 'detail': 'pair not found in user pair list'}
+        else:
+            return {'code': 434, 'detail': 'user not found'}
+
 
     @staticmethod
     async def delete_pair(pair: Pair):

@@ -34,10 +34,10 @@ async def add_pair(pair: Pair):
 
 
 @router.get('/get_pair/')
-async def get_pair(coin_id: str, vs_currency: str):
+async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
     '''Get pair data.'''
 
-    res = await Pairs.get_pair(coin_id=coin_id, vs_currency=vs_currency)
+    res = await Pairs.get_pair(coin_id=coin_id, vs_currency=vs_currency, day=day)
     if res != 433:
         return {
             'status': 'success',
@@ -47,4 +47,25 @@ async def get_pair(coin_id: str, vs_currency: str):
         raise HTTPException(
             status_code=433,
             detail='pair not found in database'
+        )
+
+
+@router.get('/send_pic')
+async def send_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
+    res = await Pairs.get_pic(
+        user_id=user_id,
+        coin_id=coin_id,
+        vs_currency=vs_currency,
+        day=day
+    )
+    if res['code'] == 200:
+        return {
+            'status': 'success',
+            'detail': f'pic send to {user_id}',
+            'data': res['detail']
+        }
+    else:
+        raise HTTPException(
+            status_code=res['code'],
+            detail=res['detail']
         )

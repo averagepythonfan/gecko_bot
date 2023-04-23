@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 from models import User, Users, Pair
 
 
@@ -96,17 +95,16 @@ async def add_new_pair(user_id: int, pair: Pair):
     :return: 439, n_pair limit is over'''
 
     res = await Users.add_pair(user_id=user_id, pair=pair)
-    if res:
-        if res['code'] == 200:
-            return {
-                'status': 'success',
-                'detail': res['detail']
-            }
-        else:
-            raise HTTPException(
-                status_code=res['code'],
-                detail=res['detail']
-            )
+    if res['code'] == 200:
+        return {
+            'status': 'success',
+            'detail': res['detail']
+        }
+    else:
+        raise HTTPException(
+            status_code=res['code'],
+            detail=res['detail']
+        )
 
 
 @router.delete('/{user_id}/delete_pair')
