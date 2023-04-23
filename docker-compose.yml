@@ -15,8 +15,9 @@ services:
       context: .
       dockerfile: fastapi/Dockerfile
     container_name: fastapi
-    env_file:
-      - .env
+    environment:
+      MONGONET: mongodb
+      TOKEN: ${TOKEN}
     volumes:
       - ./fastapi:/app
     depends_on:
@@ -31,6 +32,8 @@ services:
     container_name: tg_bot
     env_file:
       - .env
+    environment:
+      FASTAPI: fastapi
     volumes:
       - ./bot:/app
     depends_on:
