@@ -25,6 +25,18 @@ services:
     networks:
       - gecko_net
 
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - fastapi_server
+    networks:
+      - gecko_net
+
   bot:
     build:
       context: .
@@ -33,11 +45,12 @@ services:
     env_file:
       - .env
     environment:
-      FASTAPI: fastapi
+      FASTAPI: nginx
     volumes:
       - ./bot:/app
     depends_on:
       - fastapi_server
+      - nginx
     restart: always
     networks:
       - gecko_net
@@ -73,6 +86,7 @@ services:
       PG_DATABASE: artifacts
     depends_on:
       - psql_server
+      - fastapi_server
     networks:
       - gecko_net
 
