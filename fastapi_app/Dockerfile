@@ -9,7 +9,7 @@ RUN pip install "poetry==1.3.2"
 COPY poetry.lock .
 COPY pyproject.toml .
 
-COPY fastapi/ .
+COPY fastapi_app/ .
 
 # run dependencies
 RUN poetry config virtualenvs.create false && \

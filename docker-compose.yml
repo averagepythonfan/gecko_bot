@@ -13,13 +13,13 @@ services:
   fastapi_server:
     build:
       context: .
-      dockerfile: fastapi/Dockerfile
+      dockerfile: fastapi_app/Dockerfile
     container_name: fastapi
     environment:
       MONGONET: mongodb
       TOKEN: ${TOKEN}
     volumes:
-      - ./fastapi:/app
+      - ./fastapi_app:/app
     depends_on:
       - mongo
     networks:

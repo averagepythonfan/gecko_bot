@@ -24,6 +24,16 @@ seaborn = "^0.12.2"
 [tool.poetry.group.bot.dependencies]
 aiogram = "3.0.0b7"
 
+
+[tool.poetry.group.dev.dependencies]
+setuptools = "^67.7.2"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".", "bot", "fastapi",
+]
+asyncio_mode="auto"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
