@@ -1,6 +1,6 @@
 import aiohttp
 from aiogram import Router, types
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from config import ADMIN, FASTAPI
 from .misc import Entity
 from .client import Client
@@ -80,23 +80,24 @@ async def add_pair_command(message: types.Message):
     await message.reply(text=str(resp))
 
 
-async def delete_pair_command(message: types.Message):
+async def delete_pair_command(message: types.Message, command: CommandObject):
     '''Delete user's pair'''
 
-    text = message.text[8:].split('-')
+    if command.args:
+        text = command.args.split('-')
 
-    COIN = text[0]
-    VS_CURRENCY = text[1]
+        COIN = text[0]
+        VS_CURRENCY = text[1]
 
-    resp = await Client.delete(
-        entity=Entity.user.value,
-        path=f'/{message.from_user.id}/delete_pair',
-        json_data={
-            'coin_id': COIN,
-            'vs_currency': VS_CURRENCY
-        }
-    )
-    await message.reply(text=str(resp))
+        resp = await Client.delete(
+            entity=Entity.user.value,
+            path=f'/{message.from_user.id}/delete_pair',
+            json_data={
+                'coin_id': COIN,
+                'vs_currency': VS_CURRENCY
+            }
+        )
+        await message.reply(text=str(resp))
 
 
 async def my_status_command(message: types.Message):
@@ -115,8 +116,32 @@ async def my_status_command(message: types.Message):
         parse_mode='HTML')
 
 
-async def show_exchanges_command(message: types.Message):
-    pass
+async def show_exchanges_command(message: types.Message, command: CommandObject):
+    '''Send pic with exchanges to user.
+    
+    Default days = 7'''
+
+    if command.args:
+        text = command.args.split()
+        pair = text[0].split('-')
+
+        COIN = pair[0]
+        VS_CURRENCY = pair[1]
+        try:
+            DAYS = int(text[1])
+        except (IndexError, ValueError):
+            DAYS = 7
+        finally:
+            await Client.get(
+                entity=Entity.pair.value,
+                path='/send_pic',
+                params={
+                    'user_id': message.from_user.id,
+                    'coin_id': COIN,
+                    'vs_currency': VS_CURRENCY,
+                    'day': DAYS
+                }
+            )
 
 
 def register_message_handlers(router: Router) -> None:
@@ -127,3 +152,4 @@ def register_message_handlers(router: Router) -> None:
     router.message.register(delete_pair_command, Command(commands=['delete']))
     router.message.register(set_n_pair_for_user_command, Command(commands=['set']))
     router.message.register(my_status_command, Command(commands=['status']))
+    router.message.register(show_exchanges_command, Command(commands=['show']))

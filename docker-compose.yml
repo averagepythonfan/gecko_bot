@@ -55,40 +55,40 @@ services:
     networks:
       - gecko_net
 
-  psql_server:
-    image: postgres:alpine3.17
-    container_name: psql_server
-    environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=artifacts
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - .:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d artifacts"]
-      interval: 1m30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - gecko_net
+  # psql_server:
+  #   image: postgres:alpine3.17
+  #   container_name: psql_server
+  #   environment:
+  #     - POSTGRES_PASSWORD=postgres
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_DB=artifacts
+  #     - PGDATA=/var/lib/postgresql/data/pgdata
+  #   volumes:
+  #     - .:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres -d artifacts"]
+  #     interval: 1m30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+  #   networks:
+  #     - gecko_net
 
-  mlflow:
-    build:
-      context: mlflow/
-      dockerfile: Dockerfile
-    container_name: mlflow
-    environment:
-      PG_USER: postgres
-      PG_PASSWORD: postgres
-      PG_HOST: psql_server
-      PG_DATABASE: artifacts
-    depends_on:
-      - psql_server
-      - fastapi_server
-    networks:
-      - gecko_net
+  # mlflow:
+  #   build:
+  #     context: mlflow/
+  #     dockerfile: Dockerfile
+  #   container_name: mlflow
+  #   environment:
+  #     PG_USER: postgres
+  #     PG_PASSWORD: postgres
+  #     PG_HOST: psql_server
+  #     PG_DATABASE: artifacts
+  #   depends_on:
+  #     - psql_server
+  #     - fastapi_server
+  #   networks:
+  #     - gecko_net
 
 networks:
   gecko_net:

@@ -10,5 +10,6 @@
 /fastapi_app/models/__pycache__
 /fastapi_app/mongodb/__pycache__
 /fastapi_app/routers/__pycache__
+/fastapi_app/tests/__pycache__
 /.pytest_cache
 /pgdata

@@ -10,6 +10,7 @@ import time
 import os
 import logging
 import seaborn as sns
+import matplotlib.pyplot as plt
 from .misc import validate_user_data, send_pic
 from mongodb import users, pairs, other
 from .models import Pair, User
@@ -21,6 +22,7 @@ from config import TOKEN
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+sns.set_theme(style="darkgrid")
 
 class Other:
     '''Class for coins and currencies aggregation.
@@ -165,10 +167,9 @@ class Pairs:
                     fig = plot.get_figure()
                     file_name = f'{user_id}-{int(time.time())}.jpeg'
                     fig.savefig(file_name)
+                    plt.clf()
 
-                    url = f'https://api.telegram.org/bot{TOKEN}'
-                    f'/sendPhoto?chat_id={user_id}'
-                    f'&caption={coin_id.upper()}-{vs_currency.upper()}'
+                    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'
 
                     response = await send_pic(file_name, url)
                     os.remove(file_name)

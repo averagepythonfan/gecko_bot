@@ -27,10 +27,11 @@ aiogram = "3.0.0b7"
 
 [tool.poetry.group.dev.dependencies]
 setuptools = "^67.7.2"
+httpx = "^0.24.0"
 
 [tool.pytest.ini_options]
 pythonpath = [
-  ".", "bot", "fastapi",
+  ".", "fastapi_app",
 ]
 asyncio_mode="auto"
 
