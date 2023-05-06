@@ -8,10 +8,7 @@ __all__ = [
 import aiohttp
 import time
 import os
-import pandas as pd
 import logging
-import seaborn as sns
-import matplotlib.pyplot as plt
 from .misc import redis_aio, validate_user_data, send_pic, make_pic
 from mongodb import users, pairs, other
 from .models import Pair, User
@@ -23,7 +20,6 @@ from config import TOKEN
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-sns.set_theme(style="darkgrid")
 
 class Other:
     '''Class for coins and currencies aggregation.
@@ -31,6 +27,9 @@ class Other:
 
     @staticmethod
     async def update():
+        '''Update a pair data from GeckoCoin.
+        Uses from a checking if pair exist.'''
+
         headers = {
             'accept': 'application/json',
         }
@@ -42,7 +41,6 @@ class Other:
         
         try:
             async with aiohttp.ClientSession() as session:
-
                 for title, url in data.items():
                     async with session.get(url, headers=headers) as resp:
                         response = {'name': title, 'data': await resp.json()}
@@ -144,6 +142,11 @@ class Pairs:
 
     @staticmethod
     async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
+        '''Extract data from database.
+        
+        If it exists, return a JSON data,
+        otherwise return 433 response: Pair does not exist.'''
+
         result = await Other.pair_in_database(coin_id=coin_id, vs_currency=vs_currency, day=day)
         if result == 433:
             return result
@@ -152,6 +155,19 @@ class Pairs:
 
     @staticmethod
     async def get_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
+        '''Send pic to user.
+        
+        Do a POST HTTP-request to Telegram server.
+        If any user makes a request it create a pic with data exchanges
+        then cache "file_id" and request for 10 min.
+        If cache is empty or key is does not exist,
+        it creates a new picture.
+        
+        :return: 200 - JSON response
+        :return: 433 - pair is incorrect
+        :return: 434 - user does not exist
+        :return: 437 - pair not found in user's list.'''
+
         user = await users.find_one({'user_id': user_id})
         if user:
             pair = f'{coin_id}-{vs_currency}'
@@ -218,6 +234,11 @@ class Users:
 
     @staticmethod
     async def create_user(user: User):
+        '''Creates a new user, if it does not exist.
+        
+        :return: True - user successfully created
+        :return: None - user alredy exists.'''
+
         res = await users.find_one({'user_id': user.user_id})
         if res:
             return None
@@ -233,6 +254,8 @@ class Users:
 
     @staticmethod
     async def get_all_users():
+        '''Return all users data'''
+
         _users = []
         cur = users.find().sort('user_id', DESCENDING)
         docs = await cur.to_list(None)
@@ -242,12 +265,16 @@ class Users:
 
     @staticmethod
     async def get_user(user_id: int):
+        '''Get user data by user_id'''
+
         res = await users.find_one({'user_id': user_id})
         if res:
             return validate_user_data(res)
 
     @staticmethod
     async def set_n_pairs(user_id: int, n_pairs: int = 3):
+        '''Set count of available pair fot selected user (user_id)'''
+
         res = await users.find_one_and_update(
             {'user_id': user_id},
             {'$set': {'n_pairs': n_pairs}},
