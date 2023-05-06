@@ -8,10 +8,11 @@ __all__ = [
 import aiohttp
 import time
 import os
+import pandas as pd
 import logging
 import seaborn as sns
 import matplotlib.pyplot as plt
-from .misc import validate_user_data, send_pic
+from .misc import redis_aio, validate_user_data, send_pic, make_pic
 from mongodb import users, pairs, other
 from .models import Pair, User
 from pymongo import ReturnDocument, DESCENDING
@@ -85,6 +86,9 @@ class Other:
 
     @staticmethod
     async def pair_in_database(coin_id: str, vs_currency: str, day: int = 7):
+        '''Return pair data if it exists.
+        Otherwise return 433 response: Pair does not exist.'''
+
         time_slice = -(day * 24)
         res = await pairs.find_one(
             {'pair_name': f'{coin_id}-{vs_currency}'},
@@ -148,10 +152,23 @@ class Pairs:
 
     @staticmethod
     async def get_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
-        res = await users.find_one({'user_id': user_id})
-        if res:
+        user = await users.find_one({'user_id': user_id})
+        if user:
             pair = f'{coin_id}-{vs_currency}'
-            if pair in res['pairs']:
+            if pair in user['pairs']:
+                # check if exist in cache
+                async with redis_aio() as redis:
+                    value = await redis.get(f'{pair} {day}')
+                    if value:
+                        value: bytes
+                        url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
+                        params = {
+                            'chat_id': int(user_id),
+                            'photo': value.decode("utf-8")
+                        }
+                        resp = await send_pic(url=url, params=params)
+                        return {'code': 200, 'detail': resp }
+                
                 check_pair = await Other.pair_in_database(
                     coin_id=coin_id,
                     vs_currency=vs_currency,
@@ -159,21 +176,29 @@ class Pairs:
                 )
                 if check_pair != 433:
                     prices = check_pair['data']['prices']
-                    plot = sns.lineplot(data=[el[1] for el in prices])
-                    plot.set(xticklabels=[],
-                             title=pair,
-                             ylabel='value',
-                             xlabel=f'last {day} days')
-                    fig = plot.get_figure()
-                    file_name = f'{user_id}-{int(time.time())}.jpeg'
-                    fig.savefig(file_name)
-                    plt.clf()
+
+                    file_name = make_pic(
+                        prices=prices,
+                        pair=pair,
+                        user_id=user_id,
+                        day=day
+                    )
 
                     url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'
 
-                    response = await send_pic(file_name, url)
+                    response = await send_pic(
+                        file_name=file_name,
+                        url=url
+                    )
                     os.remove(file_name)
-                    logger.info(f'user_id: {user_id}, pair: {coin_id}-{vs_currency}')
+
+                    async with redis_aio() as redis:
+                        await redis.set(
+                            name=f'{pair} {day}',
+                            value=response['result']['photo'][-1]['file_id'],
+                            ex=600
+                        )
+                    logger.info(f'pair: {coin_id}-{vs_currency}, resp {response}')
                     return {'code': 200, 'detail': response }
                 else:
                     return {'code': 433, 'detail': 'pair incorrect'}
