@@ -1,0 +1,4 @@
+/bot/Dockerfile
+/fastapi_app/Dockerfile
+/mlflow_client/Dockerfile
+/nginx/Dockerfile

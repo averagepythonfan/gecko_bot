@@ -13,3 +13,5 @@
 /fastapi_app/tests/__pycache__
 /.pytest_cache
 /pgdata
+/mlflow_client/__pycache__
+/mlflow_client/routers/__pycache__
