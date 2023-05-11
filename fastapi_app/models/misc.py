@@ -10,6 +10,9 @@ import seaborn as sns
 from config import REDIS
 
 
+sns.set_theme(style="darkgrid")
+
+
 class UserResponse(BaseModel):
     _id: str
     user_id: int
@@ -87,52 +90,8 @@ def make_pic(prices: list, pair: str, user_id: int, day: int):
 
 @asynccontextmanager
 async def redis_aio():
+    '''aioredis context manager.'''
+
     redis = aioredis.from_url(f'redis://{REDIS}')
     yield redis
     await redis.close()
-
-# {
-#     'ok': True,
-#     'result': {
-#         'message_id': 306,
-#         'from': {
-#             'id': 6136318104,
-#             'is_bot': True,
-#             'first_name': 'Time Series Forecasting',
-#             'username': 'TS_Forecasting_Bot'
-#         },
-#         'chat': {
-#             'id': 875851287,
-#             'first_name': 'Евгений',
-#             'last_name': 'Исупов',
-#             'username': 'forgottenbb',
-#             'type': 'private'
-#         },
-#         'date': 1683367857,
-#         'photo': [{
-#             'file_id': 'AgACAgIAAxkDAAIBMmRWJ7F_i1Rrznpznyd70_zKpOzXAAL7xTEbCFOxSum3TNf6P9KZAQADAgADcwADLwQ',
-#             'file_unique_id': 'AQAD-8UxGwhTsUp4',
-#             'file_size': 588,
-#             'width': 90,
-#             'height': 42
-#             }, {
-#             'file_id': 'AgACAgIAAxkDAAIBMmRWJ7F_i1Rrznpznyd70_zKpOzXAAL7xTEbCFOxSum3TNf6P9KZAQADAgADbQADLwQ',
-#             'file_unique_id': 'AQAD-8UxGwhTsUpy',
-#             'file_size': 6048,
-#             'width': 320,
-#             'height': 148
-#             }, {
-#             'file_id': 'AgACAgIAAxkDAAIBMmRWJ7F_i1Rrznpznyd70_zKpOzXAAL7xTEbCFOxSum3TNf6P9KZAQADAgADeAADLwQ',
-#             'file_unique_id': 'AQAD-8UxGwhTsUp9',
-#             'file_size': 23903,
-#             'width': 800,
-#             'height': 369
-#             }, {
-#             'file_id': 'AgACAgIAAxkDAAIBMmRWJ7F_i1Rrznpznyd70_zKpOzXAAL7xTEbCFOxSum3TNf6P9KZAQADAgADeQADLwQ',
-#             'file_unique_id': 'AQAD-8UxGwhTsUp-',
-#             'file_size': 28129,
-#             'width': 1040,
-#             'height': 480
-#             }]
-#     }
-# }
