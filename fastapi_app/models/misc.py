@@ -5,9 +5,10 @@ import aioredis
 from pydantic import BaseModel
 from typing import List
 import pandas as pd
+from pandas.core.frame import DataFrame
 import matplotlib.pyplot as plt
 import seaborn as sns
-from config import REDIS
+from config import REDIS, TOKEN
 
 
 sns.set_theme(style="darkgrid")
@@ -30,7 +31,7 @@ def validate_user_data(input_data):
     return valid.dict()
 
 
-async def send_pic(url: str, file_name: str | None = None, params: dict | None = None) -> dict:
+async def send_pic(user_id: int, file_name: str | None = None, params: dict | None = None) -> dict:
     '''Send pic to user by POST HTTP-request to Telegram API.
     
     Return a JSON with response from Telegram server.
@@ -42,6 +43,9 @@ async def send_pic(url: str, file_name: str | None = None, params: dict | None =
         format {user_id}-{int(time.time())}.jpeg
     url:
         format https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'''
+    
+    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'
+
     if file_name:
         with open(file_name, 'rb') as img:
             async with aiohttp.ClientSession() as session:
@@ -85,6 +89,43 @@ def make_pic(prices: list, pair: str, user_id: int, day: int):
     fig.savefig(file_name)
 
     plt.clf()
+    return file_name
+
+
+def make_forecast_pic(
+        prices: list,
+        forecast: str,
+        user_id: int,
+        pair: str,
+        day_before: int = 12
+    ) -> str:
+    '''Makes a pic with forecast data.
+    
+    Return a file name (format: '{user_id}-{int(time.time())}.jpeg').'''
+
+    df = pd.DataFrame(prices, columns=['ds', 'y'])
+    df.ds = pd.to_datetime(df.ds // 1000, unit='s')
+
+    forecast = pd.read_json(forecast)
+
+    treshold = -(24 * day_before)
+    target_list = ['yhat_upper', 'yhat_lower', 'yhat']
+    
+    plt.figure(figsize=(17,8), dpi=80)
+    plot = sns.lineplot(data=df, x=df.ds[treshold:], y=df.y[treshold:], label='data')
+    for target in target_list:
+        diff = df.y.iloc[-1] - forecast[target].iloc[0]
+        sns.lineplot(data=forecast, x=forecast.ds, y=forecast[target]+diff, label=target)
+    plot.set(xlabel=f'Last {-treshold//24} days', ylabel='Closing Price')
+    plot.set_title(pair)
+    plot.legend(loc=0)
+
+    fig = plot.get_figure()
+    file_name = f'{user_id}-{1223}.jpeg'
+    fig.savefig(file_name)
+
+    plt.clf()
+
     return file_name
 
 

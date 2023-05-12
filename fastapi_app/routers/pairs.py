@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from models import Pair, Pairs
+from models import Pair, Pairs, Models
 
 
 router = APIRouter(
@@ -33,7 +33,7 @@ async def add_pair(pair: Pair):
         }
 
 
-@router.get('/get_pair/')
+@router.get('/get_pair')
 async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
     '''Get pair data.'''
 
@@ -69,3 +69,21 @@ async def send_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
             status_code=res['code'],
             detail=res['detail']
         )
+
+@router.post('/forecast')
+async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'prophet-model'):
+    '''Forecast for {day} by {model_uri}'''
+    res = await Models.get_model_uri(model=model)
+    
+    params = dict({'day': str(day), **res})
+    forecast = await Models.forecast(**params)
+
+    pic = await Models.send_forecast_pic(
+        user_id=user_id,
+        pair=pair,
+        forecast=forecast['predictions']
+    )
+    return {
+        'code': 200,
+        'detail': pic
+    }

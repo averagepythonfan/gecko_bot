@@ -1,7 +1,8 @@
 __all__ = [
     'Other',
     'Users',
-    'Pairs'
+    'Pairs',
+    'Models'
 ]
 
 
@@ -9,12 +10,13 @@ import aiohttp
 import time
 import os
 import logging
-from .misc import redis_aio, validate_user_data, send_pic, make_pic
+from pandas.core.frame import DataFrame
+from .misc import redis_aio, validate_user_data, send_pic, make_pic, make_forecast_pic
 from mongodb import users, pairs, other
 from .models import Pair, User
 from pymongo import ReturnDocument, DESCENDING
 from pymongo.results import DeleteResult, InsertOneResult
-from config import TOKEN
+from config import EXPERIMENT, TOKEN, MLFLOW_CLIENT, MLFLOW_SERVER
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -100,8 +102,37 @@ class Other:
             )
         if res:
             return res
-        else:
-            return 433
+
+    
+    @staticmethod
+    async def checker(user_id: int, coin_id: str, vs_currency: str, day: int) -> dict | None:
+        '''Check if user exist, pair exist in user's list and database.
+        
+        If all is "True" return pair data.
+        Otherwise, returns None.'''
+
+        default = {
+            'user_exist': False,
+            'pair_in_db': False,
+            'pair_in_users_list': False,
+        }
+        pair = f'{coin_id}-{vs_currency}'
+        user = await users.find_one({'user_id': user_id})
+        if user:
+            if pair in user['pairs']:
+                default['pair_in_users_list'] = True
+                pair_in_db = await Other.pair_in_database(
+                    coin_id=coin_id,
+                    vs_currency=vs_currency,
+                    day=day
+                )
+                if pair_in_db:
+                    default['pair_in_db'] = True
+            default['user_exist'] = True
+        
+        if all(default.values()):
+            return pair_in_db
+
 
 class Pairs:
     '''CRUD for pairs'''
@@ -200,11 +231,9 @@ class Pairs:
                         day=day
                     )
 
-                    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'
-
                     response = await send_pic(
                         file_name=file_name,
-                        url=url
+                        user_id=user_id
                     )
                     os.remove(file_name)
 
@@ -214,7 +243,7 @@ class Pairs:
                             value=response['result']['photo'][-1]['file_id'],
                             ex=600
                         )
-                    logger.info(f'pair: {coin_id}-{vs_currency}, resp {response}')
+
                     return {'code': 200, 'detail': response }
                 else:
                     return {'code': 433, 'detail': 'pair incorrect'}
@@ -340,3 +369,108 @@ class Users:
     async def delete_user(user_id: int):
         res: DeleteResult = await users.delete_one({'user_id': user_id})
         return res.raw_result
+
+
+class Models:
+
+    main_experiment: str = EXPERIMENT
+
+    @classmethod
+    async def get_model_uri(cls, model: str = 'prophet-model') -> dict | None:
+        '''Class method return a dict with model_uri and last_day.
+        
+        If any exception raise then return None.
+        Format:
+        {
+            "model_uri": "runs:/844793cfeeb44e01b9f27b8ca15b015e/prophet-model",
+            "last_day": "2023-04-12 20:00:30"
+        }'''
+
+        async with aiohttp.ClientSession() as session:
+
+            url_get = f'http://{MLFLOW_SERVER}:5000/api/2.0/mlflow/experiments/get-by-name'
+            params = {'experiment_name': cls.main_experiment}
+
+            async with session.get(url_get,
+                                   params=params) as get_resp:
+                if get_resp.status == 200:
+                    res = await get_resp.json()
+                    exp_id = res['experiment']['experiment_id']
+                    url_post = f'http://{MLFLOW_SERVER}:5000/api/2.0/mlflow/runs/search'
+                    data = {'experiment_ids': [exp_id]}
+
+                    async with session.post(url_post,
+                                            json=data) as post_resp:
+                        if post_resp.status == 200:
+                            runs = await post_resp.json()
+                            run_uuid = runs['runs'][0]['info']['run_uuid']
+                            model_uri = f'runs:/{run_uuid}/{model}'
+                            last_data = [
+                                el['value'] for el in runs['runs'][0]['data']['params'] if el['key'] == 'last_day'
+                            ]
+                            return {
+                                'model_uri' : model_uri,
+                                'last_data': last_data.pop()
+                            }
+
+    @staticmethod
+    async def forecast(day: int, model_uri: str, last_data: str):
+        '''Forecast for day through Mlflow Client'''
+
+        logger.info(f'params {day} {model_uri} {last_data}')
+        async with aiohttp.ClientSession() as session:
+
+            headers = {
+                'accept': 'application/json',
+                'content-type': 'application/x-www-form-urlencoded',
+            }
+
+            params = {
+                'day': day,
+                'model_uri': model_uri,
+                'last_data': last_data,
+            }
+
+            async with session.post(
+                f'http://{MLFLOW_CLIENT}/prophet/predict',
+                params=params,
+                headers=headers) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+    
+    @staticmethod
+    async def send_forecast_pic(user_id: int, pair: Pair, forecast: str, day_before: int = 12):
+        '''Makes a picture with forecast for user.
+        
+        Send it by Telegram Bot API.'''
+
+        res = await Other.checker(
+            user_id=user_id,
+            coin_id=pair.coin_id,
+            vs_currency=pair.vs_currency,
+            day=day_before
+        )
+
+        if res:
+            file_name = make_forecast_pic(
+                prices=res['data']['prices'],
+                forecast=forecast,
+                user_id=user_id,
+                pair=f"{pair.coin_id}-{pair.vs_currency}",
+                day_before=day_before
+            )
+
+            response = await send_pic(
+                file_name=file_name,
+                user_id=user_id
+            )
+            os.remove(file_name)
+
+            async with redis_aio() as redis:
+                await redis.set(
+                    name=f'{pair.coin_id}-{pair.vs_currency} forecast for {day_before}',
+                    value=response['result']['photo'][-1]['file_id'],
+                    ex=600
+                )
+
+            return {'code': 200, 'detail': response }
