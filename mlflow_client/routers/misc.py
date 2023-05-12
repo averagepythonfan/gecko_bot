@@ -1,6 +1,8 @@
 import mlflow
 import time
-import pandas as pd
+import numpy as np
+from pandas import DateOffset
+from pandas.core.frame import DataFrame
 from mlflow import MlflowClient
 from config import MLFLOW
 from prophet import Prophet
@@ -12,11 +14,9 @@ def get_client() -> MlflowClient:
     yield client
     del client
 
-def single_run(df: str, experiment_id: str) -> dict:
+def single_run(df: DataFrame, experiment_id: str) -> dict:
     '''Create a single run. Return a dict with response.'''
-    read = pd.read_json(df)
-    read.ds = pd.to_datetime(read.ds//1000, unit='s')
-    time_now = int(time.time()) // 1000
+    time_now = int(time.time())
     try:
         m = Prophet()
         mlflow.start_run(
@@ -25,12 +25,13 @@ def single_run(df: str, experiment_id: str) -> dict:
             tags={"model": "prophet", "priority": "P1"},
             description=f'Model create run at {time_now}'
         )
-        m.fit(read)
+        m.fit(df)
 
         model_params = {
                 name: value for name, value in vars(m).items() if np.isscalar(value)
         }
         mlflow.log_params(model_params)
+        mlflow.log_param('last_day', str(df.ds.iloc[-1] + DateOffset(hours=1)))
 
         cv_results = cross_validation(
                 m, initial='1800 hours', period='60 hours', horizon='120 hours'

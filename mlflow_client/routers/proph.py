@@ -1,10 +1,9 @@
+import requests
 import mlflow
-import time
-import numpy as np
 import pandas as pd
 from mlflow import MlflowClient
 from fastapi import APIRouter, Depends, HTTPException
-from config import MLFLOW, EXPERIMENT
+from config import MLFLOW, EXPERIMENT, FASTAPI
 from .misc import get_client, single_run
 from mlflow.exceptions import RestException
 
@@ -18,7 +17,7 @@ mlflow.set_tracking_uri(f'http://{MLFLOW}:5000')
 
 
 @router.post('/do_run')
-def create_prophet_run(df: str, client: MlflowClient = Depends(get_client)):
+def create_prophet_run(coin: str, vs_currency: str, client: MlflowClient = Depends(get_client)):
     '''Create a one run of Prophet Model.
 
     Firstly, it find a existing experiment by name.
@@ -39,6 +38,23 @@ def create_prophet_run(df: str, client: MlflowClient = Depends(get_client)):
     Return a dict with format:
         :return:code: 200 - successful run
         :return:code: 433 - failed run'''
+
+    headers = {
+    'accept': 'application/json',
+}
+
+    params = {
+        'coin_id': coin,
+        'vs_currency': vs_currency,
+        'day': '89',
+    }
+
+    response = requests.get(f'http://{FASTAPI}/pair/get_pair', params=params, headers=headers)
+
+    prices = response.json()['prices']
+    df = pd.DataFrame(prices, columns=['ds', 'y'])
+    df.ds = df.ds // 1000
+    df.ds = pd.to_datetime(df.ds, unit='s')
 
     exp = client.get_experiment_by_name(EXPERIMENT)
     if exp:
