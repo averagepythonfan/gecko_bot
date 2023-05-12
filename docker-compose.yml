@@ -25,6 +25,8 @@ services:
       MONGONET: mongodb
       TOKEN: ${TOKEN}
       REDIS: redisdb
+      MLFLOW_CLIENT: mlflow_client
+      MLFLOW_SERVER: mlflow_server
     volumes:
       - ./fastapi_app:/app
     depends_on:
@@ -65,6 +67,9 @@ services:
   mlflow_server:
     image: ubuntu/mlflow:2.1.1_1.0-22.04
     container_name: mlflow_server
+    volumes:
+      - ./mlflow_server/mlruns:/mlruns
+      - ./mlflow_server/mlartifacts:/mlartifacts
     command: mlflow server -h 0.0.0.0 -p 5000
     networks:
       - gecko_net
@@ -76,6 +81,7 @@ services:
     container_name: mlflow_client
     environment:
       MLFLOW: mlflow_server
+      FASTAPI: nginx
     volumes:
       - ./mlflow_client:/app
     depends_on:
