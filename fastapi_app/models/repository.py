@@ -452,6 +452,17 @@ class Models:
         )
 
         if res:
+            async with redis_aio() as redis:
+                value = await redis.get(f'{pair.coin_id}-{pair.vs_currency} forecast for {day_before}')
+                if value:
+                    value: bytes
+                    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
+                    params = {
+                        'chat_id': int(user_id),
+                        'photo': value.decode("utf-8")
+                    }
+                    resp = await send_pic(url=url, params=params)
+                    return {'code': 200, 'detail': resp }
             file_name = make_forecast_pic(
                 prices=res['data']['prices'],
                 forecast=forecast,
@@ -461,8 +472,8 @@ class Models:
             )
 
             response = await send_pic(
-                file_name=file_name,
-                user_id=user_id
+                url=f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}',
+                file_name=file_name
             )
             os.remove(file_name)
 

@@ -43,12 +43,14 @@ class Client:
                    path: str,
                    headers: dict = {'accept': 'application/json',
                                     'Content-Type': 'application/json',},
+                   params: dict = {},
                    json_data: dict = {}) -> dict:
         '''POST mothod: all types'''
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{FASTAPI}:80{entity}{path}',
+                params=params,
                 headers=headers,
                 json=json_data
             ) as resp:

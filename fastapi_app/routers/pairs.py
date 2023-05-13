@@ -81,7 +81,9 @@ async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'pro
     pic = await Models.send_forecast_pic(
         user_id=user_id,
         pair=pair,
-        forecast=forecast['predictions']
+        forecast=forecast['predictions'],
+        day_before=day*3
+
     )
     return {
         'code': 200,

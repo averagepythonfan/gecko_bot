@@ -143,6 +143,41 @@ async def show_exchanges_command(message: types.Message, command: CommandObject)
                 }
             )
 
+async def prophet_forecast(message: types.Message, command: CommandObject):
+    '''Forecasting for {days} by prophet model.'''
+
+    if command.args:
+        text = command.args.split()
+        COIN_ID, VS_CURRENCY = text[0].split('-')
+        DAY_FORECAST = text[1]
+
+
+
+        headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+
+        params = {
+            'day': DAY_FORECAST,
+            'user_id': message.from_user.id,
+            'model': 'prophet-model',
+        }
+
+        json_data = {
+            'coin_id': COIN_ID,
+            'vs_currency': VS_CURRENCY,
+        }
+
+
+        await Client.post(
+            entity=Entity.pair.value,
+            path='/forecast',
+            headers=headers,
+            params=params,
+            json_data=json_data
+        )
+
 
 def register_message_handlers(router: Router) -> None:
     router.message.register(help_command, Command(commands=['help', 'start']))
@@ -153,3 +188,4 @@ def register_message_handlers(router: Router) -> None:
     router.message.register(set_n_pair_for_user_command, Command(commands=['set']))
     router.message.register(my_status_command, Command(commands=['status']))
     router.message.register(show_exchanges_command, Command(commands=['show']))
+    router.message.register(prophet_forecast, Command(commands=['prophet']))
