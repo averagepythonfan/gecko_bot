@@ -31,7 +31,7 @@ def validate_user_data(input_data):
     return valid.dict()
 
 
-async def send_pic(url: str, file_name: str | None = None, params: dict | None = None) -> dict:
+async def send_pic(url: int, file_name: str | None = None, params: dict | None = None) -> dict:
     '''Send pic to user by POST HTTP-request to Telegram API.
     
     Return a JSON with response from Telegram server.
@@ -43,7 +43,7 @@ async def send_pic(url: str, file_name: str | None = None, params: dict | None =
         format {user_id}-{int(time.time())}.jpeg
     url:
         format https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}'''
-    
+
     if file_name:
         with open(file_name, 'rb') as img:
             async with aiohttp.ClientSession() as session:

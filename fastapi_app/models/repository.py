@@ -232,8 +232,8 @@ class Pairs:
                     )
 
                     response = await send_pic(
-                        file_name=file_name,
-                        user_id=user_id
+                        url=f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}',
+                        file_name=file_name
                     )
                     os.remove(file_name)
 
