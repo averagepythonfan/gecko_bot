@@ -73,19 +73,31 @@ async def send_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
 @router.post('/forecast')
 async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'prophet-model'):
     '''Forecast for {day} by {model_uri}'''
-    res = await Models.get_model_uri(model=model)
-    
-    params = dict({'day': str(day), **res})
-    forecast = await Models.forecast(**params)
-
-    pic = await Models.send_forecast_pic(
-        user_id=user_id,
-        pair=pair,
-        forecast=forecast['predictions'],
-        day_before=day*3
-
+    res = await Models.get_model_uri(
+        pair=f'{pair.coin_id}-{pair.vs_currency}',
+        model=model
     )
-    return {
-        'code': 200,
-        'detail': pic
-    }
+    if res:
+        params = dict({'day': str(day), **res})
+        forecast = await Models.forecast(**params)
+
+        pic = await Models.send_forecast_pic(
+            user_id=user_id,
+            pair=pair,
+            forecast=forecast['predictions'],
+            day_before=day*3
+
+        )
+        return {
+            'code': 200,
+            'detail': pic
+        }
+    else:
+        await Models.create_run_by_pair(
+            coin_id=pair.coin_id,
+            vs_currency=pair.vs_currency
+        )
+        raise HTTPException(
+            status_code=446,
+            detail=f'model {pair.coin_id}-{pair.vs_currency} does not ready'
+        )

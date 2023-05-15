@@ -373,10 +373,22 @@ class Users:
 
 class Models:
 
-    main_experiment: str = EXPERIMENT
+    @staticmethod
+    async def create_run_by_pair(coin_id: str, vs_currency: str) -> dict | None:
+        '''Send request to mlflow client to do run.'''
+        async with aiohttp.ClientSession() as session:
+            url = f'http://{MLFLOW_CLIENT}:80/prophet/do_run'
+            params = {
+                'coin_id': coin_id,
+                'vs_currency': vs_currency
+            }
+            async with session.post(url=url,
+                                    params=params) as resp:
+                if resp.status == 200:
+                    return await resp.json()
 
-    @classmethod
-    async def get_model_uri(cls, model: str = 'prophet-model') -> dict | None:
+    @staticmethod
+    async def get_model_uri(pair: str, model: str = 'prophet-model') -> dict | None:
         '''Class method return a dict with model_uri and last_day.
         
         If any exception raise then return None.
@@ -389,7 +401,7 @@ class Models:
         async with aiohttp.ClientSession() as session:
 
             url_get = f'http://{MLFLOW_SERVER}:5000/api/2.0/mlflow/experiments/get-by-name'
-            params = {'experiment_name': cls.main_experiment}
+            params = {'experiment_name': pair}
 
             async with session.get(url_get,
                                    params=params) as get_resp:

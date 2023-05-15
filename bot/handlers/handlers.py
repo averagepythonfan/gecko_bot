@@ -170,13 +170,17 @@ async def prophet_forecast(message: types.Message, command: CommandObject):
         }
 
 
-        await Client.post(
+        res = await Client.post(
             entity=Entity.pair.value,
             path='/forecast',
             headers=headers,
             params=params,
             json_data=json_data
         )
+
+        if res is None:
+            await message.reply(f'Your model is not ready now. It is preparing')
+
 
 
 def register_message_handlers(router: Router) -> None:

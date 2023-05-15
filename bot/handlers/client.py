@@ -54,9 +54,11 @@ class Client:
                 headers=headers,
                 json=json_data
             ) as resp:
+                status = resp.status
                 response = await resp.json()
-        return response
-    
+        if status == 200:
+            return response
+
     @staticmethod
     async def delete(entity: str,
                      path: str,

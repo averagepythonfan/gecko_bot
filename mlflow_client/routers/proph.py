@@ -3,7 +3,7 @@ import mlflow
 import pandas as pd
 from mlflow import MlflowClient
 from fastapi import APIRouter, Depends, HTTPException
-from config import MLFLOW, EXPERIMENT, FASTAPI
+from config import MLFLOW, FASTAPI
 from .misc import get_client, single_run
 from mlflow.exceptions import RestException
 
@@ -17,7 +17,7 @@ mlflow.set_tracking_uri(f'http://{MLFLOW}:5000')
 
 
 @router.post('/do_run')
-def create_prophet_run(coin: str, vs_currency: str, client: MlflowClient = Depends(get_client)):
+def create_prophet_run(coin_id: str, vs_currency: str, client: MlflowClient = Depends(get_client)):
     '''Create a one run of Prophet Model.
 
     Firstly, it find a existing experiment by name.
@@ -28,10 +28,11 @@ def create_prophet_run(coin: str, vs_currency: str, client: MlflowClient = Depen
     Parameters
     ----------
     
-    df:
-        Must be string. JSONed by Pandas method:
-        >>> df.to_json()
-        >>> '{"ds":{"0":1681329630,"1":1681333230,"2":1681336830}}'
+    coin_id:
+        coin id, must be string.
+        for example: bitcoin, ethereum, etc.
+    vs_currency:
+        mast be string, examples: usd, rub, eth
     client:
         mlflow client to work with mlflow API.
         
@@ -39,12 +40,14 @@ def create_prophet_run(coin: str, vs_currency: str, client: MlflowClient = Depen
         :return:code: 200 - successful run
         :return:code: 433 - failed run'''
 
+    EXPERIMENT = f'{coin_id}-{vs_currency}'
+
     headers = {
     'accept': 'application/json',
-}
+    }
 
     params = {
-        'coin_id': coin,
+        'coin_id': coin_id,
         'vs_currency': vs_currency,
         'day': '89',
     }
