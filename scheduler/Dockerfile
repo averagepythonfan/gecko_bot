@@ -12,7 +12,7 @@ COPY pyproject.toml .
 RUN poetry config virtualenvs.create false && \
     poetry install --only scheduler
 
-COPY mlflow_client/ .
+COPY scheduler/ .
 
 ENTRYPOINT [ "python3" ]
 

@@ -31,6 +31,7 @@ services:
       - ./fastapi_app:/app
     depends_on:
       - mongo
+      - redis
     networks:
       - gecko_net
 
@@ -58,7 +59,6 @@ services:
     volumes:
       - ./bot:/app
     depends_on:
-      - fastapi_server
       - nginx
     restart: always
     networks:
@@ -70,6 +70,8 @@ services:
     volumes:
       - ./mlflow_server/mlruns:/mlruns
       - ./mlflow_server/mlartifacts:/mlartifacts
+    depends_on:
+      - bot
     command: mlflow server -h 0.0.0.0 -p 5000
     networks:
       - gecko_net
@@ -89,6 +91,25 @@ services:
       - fastapi_server
     networks:
       - gecko_net
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    container_name: scheduler_sync
+    environment:
+      MONGO: mongodb
+      MLFLOW_CLIENT: mlflow_client
+      MLFLOW_SERVER: mlflow_server
+    volumes:
+      - ./scheduler:/app
+    depends_on:
+      - mlflow_server
+      - mlflow_client
+      - mongo
+    networks:
+      - gecko_net
+
 
 networks:
   gecko_net:

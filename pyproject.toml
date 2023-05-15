@@ -43,6 +43,7 @@ pandas = "^2.0.1"
 [tool.poetry.group.scheduler.dependencies]
 schedule = "^1.2.0"
 requests = "^2.30.0"
+pymongo = "4.3.3"
 
 [tool.pytest.ini_options]
 pythonpath = [

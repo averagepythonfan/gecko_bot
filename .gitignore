@@ -16,3 +16,5 @@
 /mlflow_client/__pycache__
 /mlflow_client/routers/__pycache__
 /mlflow_server
+/scheduler/__pycache__
+/scheduler/tasks/__pycache__
