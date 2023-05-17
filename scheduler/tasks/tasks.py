@@ -1,13 +1,15 @@
 import requests
 import time
 import logging
+from datetime import datetime
 from pymongo import MongoClient
-from config import MONGO, MLFLOW_CLIENT, MLFLOW_SERVER
+from config import MONGO, MLFLOW_CLIENT, MLFLOW_SERVER, TOKEN, ADMIN
 
 
 __all__ = [
     'PairTask',
-    'ModelTask'
+    'ModelTask',
+    'GeckoCoinAPIException'
 ]
 
 
@@ -85,6 +87,16 @@ class PairTask:
             logger.info(f'Pair {el} inserted, ID: {res.inserted_id}')
             logger.debug('Wait for 10 seconds') # replace to logging
             time.sleep(10)
+    
+    @staticmethod
+    def on_failure():
+        params = {
+            'chat_id': ADMIN,
+            'text': f'Updating pairs fail at {datetime.now()}'
+        }
+
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.get(url=url, params=params)
 
 
 class ModelTask:
