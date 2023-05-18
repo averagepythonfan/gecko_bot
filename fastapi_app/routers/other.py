@@ -15,15 +15,8 @@ async def update_other():
     :return: 200, successfull update,
     :return: 438, data update error'''
 
-    result = await Other.update()
+    await Other.update()
 
-    if result:
-        return {
-            'detail': 'successfull update',
-            'data': str(result)
-        }
-    else:
-        raise HTTPException(
-            status_code=438,
-            detail='failed coin and vs_currencies data update'
-        )
+    return {
+        'detail': 'successfull update'
+    }

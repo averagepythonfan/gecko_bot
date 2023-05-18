@@ -58,9 +58,9 @@ class Other:
             async with unit_of_work('other') as uow:
                 resp = await uow.read({'name': el['name']})
                 if resp:
-                    return await uow.update(el)
+                    await uow.update({"$set": {'data': el}})
                 else:
-                    return await uow.create(el)
+                    await uow.create(el)
 
     
     @staticmethod
@@ -100,7 +100,7 @@ class Other:
 
         time_slice = -(day * 24)
 
-        async with unit_of_work('other') as uow:
+        async with unit_of_work('pairs') as uow:
             query = {'pair_name': f'{coin_id}-{vs_currency}'}
             projection = {
                 'data': {
@@ -109,7 +109,7 @@ class Other:
                     'total_volumes': 0
                 }
             }
-            return await uow.read(query=query, projection=projection)
+            return await uow.find_id(query=query, projection=projection)
 
     
     @staticmethod
@@ -175,7 +175,7 @@ class Pairs:
                     'data': data
                 })
 
-    # DEPRICATED
+    # ONLY FOR MLFLOW CLIENT
     @staticmethod
     async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
         '''Extract data from database.
@@ -323,7 +323,7 @@ class Users:
         await Other._pair_existence(pair=pair)
 
         async with unit_of_work('users') as uow:
-            user = await uow.read({'user_id': user_id}, {'_id': 0})
+            user = await uow.read({'user_id': user_id})
             if user:
                 if user['n_pairs'] > len(user['pairs']):
                     pair_name = f'{pair.coin_id}-{pair.vs_currency}'

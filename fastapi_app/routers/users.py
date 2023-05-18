@@ -61,7 +61,7 @@ async def get_user_data(user_id: int):
     try:
         return {
             'status': 'success',
-            'user_data': f"{await Users.get_user(user_id=user_id)}"
+            'user_data': await Users.get_user(user_id=user_id)
         }
     except UserNotFound:
         raise HTTPException(

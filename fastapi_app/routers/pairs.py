@@ -69,6 +69,25 @@ async def send_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
         )
 
 
+@router.get('/get_pair')
+async def get_pair(coin_id: str, vs_currency: str, day: int):
+    try:
+        res = await Pairs.get_pair(
+            coin_id=coin_id,
+            vs_currency=vs_currency,
+            day=day
+        )
+        return {
+            'status': 'success',
+            'prices': res
+        }
+    except PairNotInDataBase:
+        raise HTTPException(
+            status_code=438,
+            detail='pair not in database'
+        )
+
+
 @router.post('/forecast')
 async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'prophet-model'):
     '''Forecast for {day} by {model_uri}'''
@@ -76,7 +95,8 @@ async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'pro
         await Other.checker(
             user_id=user_id,
             coin_id=pair.coin_id,
-            vs_currency=pair.vs_currency
+            vs_currency=pair.vs_currency,
+            day=day
         )
         res = await Models.get_model_uri(
             pair=f'{pair.coin_id}-{pair.vs_currency}',
@@ -93,7 +113,7 @@ async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'pro
 
         )
         return {
-            'code': 200,
+            'status': 'success',
             'detail': pic
         }
 
@@ -113,9 +133,13 @@ async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'pro
             detail='user not found'
         )
     except MlflowServerError as e:
+        await Models.create_run_by_pair(
+            coin_id=pair.coin_id,
+            vs_currency=pair.vs_currency
+        )
         raise HTTPException(
             status_code=439,
-            detail=f'{e}'
+            detail=f'{e}, your model is preparing'
         )
     except MlflowClientError as e:
         raise HTTPException(
