@@ -23,39 +23,72 @@ Tree:
 ```
 .
 ├── bot
-│   ├── handlers
-│   │   ├── client.py
-│   │   ├── handlers.py
-│   │   ├── __init__.py
-│   ├── main.py
-│   ├── config.py
-│   ├── Dockerfile
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── handlers
+│   │   ├── client.py
+│   │   ├── handlers.py
+│   │   ├── help_command.py
+│   │   ├── __init__.py
+│   │   ├── misc.py
+│   ├── main.py
+├── fastapi_app
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── main.py
+│   ├── models
+│   │   ├── exc.py
+│   │   ├── __init__.py
+│   │   ├── misc.py
+│   │   ├── models.py
+│   │   └── repository.py
+│   ├── mongodb
+│   │   ├── __init__.py
+│   │   ├── mongodb.py
+│   ├── routers
+│   │   ├── __init__.py
+│   │   ├── other.py
+│   │   ├── pairs.py
+│   │   └── users.py
+│   └── tests
+│       └── test_healthcheck.py
+├── mlflow_client
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── main.py
+│   └── routers
+│       ├── __init__.py
+│       ├── misc.py
+│       └── proph.py
+├── mlflow_server
+│   ├── mlartifacts
+│   └── mlruns
+├── mongo
+│   └── data
+├── nginx
+│   ├── Dockerfile
+│   └── nginx.conf
+├── pgdata
+├── scheduler
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── main.py
+│   └── tasks
+│       ├── __init__.py
+│       └── tasks.py
+├── setup.cfg
+├── tests
+│   ├── conftest.py
+│   └── test_handlers
+│       ├── __init__.py
+│       └── test_start.py
 ├── docker-compose.yml
-├── fastapi
-│   ├── models
-│   │   ├── exceptions.py
-│   │   ├── __init__.py
-│   │   ├── misc.py
-│   │   ├── models.py
-│   │   └── repository.py
-│   ├── mongodb
-│   │   ├── __init__.py
-│   │   ├── mongodb.py
-│   └── routers
-│       ├── __init__.py
-│       ├── other.py
-│       ├── pairs.py
-│       └── users.py
-│   ├── config.py
-│   ├── Dockerfile
-│   ├── main.py
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── setup.cfg
 ├── poetry.lock
 ├── pyproject.toml
 ├── README.md
-└── tests
-    ├── conftest.py
-    └── test_handlers
-        ├── __init__.py
-        └── test_start.py
 
 ```
