@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from models import User, Users, Pair
+from models import (UserAlreadyExist, UserCreationError,
+                    UserNotFound, UserUpdateError,
+                    PairListIsOver, VsCurrencyIncorrect,
+                    CoinIdIncorrect)
 
 
 router = APIRouter(
@@ -13,18 +17,22 @@ async def create_user(user: User):
     '''Creates a user.
     
     :return: 200, inserted id
-    :return: 434, user already exists.'''
-
-    res = await Users.create_user(user=user)
-    if res:
+    :return: 434, user already exists
+    :return: 435, user creation error.'''
+    try:
         return {
             'status': 'success',
-            'detail': f'Inserted: {res}'
+            'detail': f'{await Users.create_user(user=user)}'
         }
-    else:
+    except UserAlreadyExist:
         raise HTTPException(
             status_code=434,
             detail='User already exists'
+        )
+    except UserCreationError:
+        raise HTTPException(
+            status_code=434,
+            detail='User creation error'
         )
 
 
@@ -50,16 +58,15 @@ async def get_user_data(user_id: int):
     :return: 200, user data
     :return: 435, user not found'''
 
-    res = await Users.get_user(user_id=user_id)
-    if res:
+    try:
         return {
             'status': 'success',
-            'user_data': res
+            'user_data': f"{await Users.get_user(user_id=user_id)}"
         }
-    else:
+    except UserNotFound:
         raise HTTPException(
             status_code=435,
-            detail='User not found'
+            detail='user not found'
         )
 
 
@@ -71,13 +78,12 @@ async def set_n_pairs_for_user(user_id: int, n_pairs: int):
     :return: 200, updated user data
     :return: 436, setting n_pairs error'''
 
-    res = await Users.set_n_pairs(user_id=user_id, n_pairs=n_pairs)
-    if res:
+    try:
         return {
             'status': 'success',
-            'user_data': res
+            'user_data': f'{await Users.set_n_pairs(user_id=user_id, n_pairs=n_pairs)}'
         }
-    else:
+    except UserUpdateError:
         raise HTTPException(
             status_code=436,
             detail='setting n_pairs error'
@@ -94,16 +100,36 @@ async def add_new_pair(user_id: int, pair: Pair):
     :return: 435, user not found {user_id}
     :return: 439, n_pair limit is over'''
 
-    res = await Users.add_pair(user_id=user_id, pair=pair)
-    if res['code'] == 200:
+
+    try:
         return {
             'status': 'success',
-            'detail': res['detail']
+            'detail': f'{await Users.add_pair(user_id=user_id, pair=pair)}'
         }
-    else:
+    except UserUpdateError:
         raise HTTPException(
-            status_code=res['code'],
-            detail=res['detail']
+            status_code=436,
+            detail='user update error'
+        )
+    except PairListIsOver:
+        raise HTTPException(
+            status_code=437,
+            detail='pair list is over'
+        )
+    except UserNotFound:
+        raise HTTPException(
+            status_code=435,
+            detail='user not found'
+        )
+    except VsCurrencyIncorrect:
+        raise HTTPException(
+            status_code=432,
+            detail='vs_currency incorrect'
+        )
+    except CoinIdIncorrect:
+        raise HTTPException(
+            status_code=433,
+            detail='coin_id incorrect'
         )
 
 
@@ -114,19 +140,19 @@ async def delete_user_pair(user_id: int, pair: Pair):
     :return: 200, pair successfully deleted,
     :return: 437, pair not found'''
 
-    res = await Users.delete_users_pair(
-        user_id=user_id,
-        pair=f'{pair.coin_id}-{pair.vs_currency}'
-    )
-    if res['code'] == 200:
+    try:
+        res = await Users.delete_users_pair(
+            user_id=user_id,
+            pair=f'{pair.coin_id}-{pair.vs_currency}'
+        )
         return {
             'status': 'success',
-            'detail': res['detail']
+            'detail': res
         }
-    else:
+    except UserUpdateError:
         raise HTTPException(
             status_code=437,
-            detail=res['detail'] + f'{pair.coin_id}-{pair.vs_currency}'
+            detail='pair not found in list'
         )
 
 
@@ -137,13 +163,12 @@ async def delete_user(user_id: int):
     :return: 200, deletion data {'n': 1, 'ok': 1.0}
     :return: 435, deletion error: user not found'''
 
-    res = await Users.delete_user(user_id=user_id)
-    if res:
+    try:
         return {
             'status': 'success',
-            'detail': f'{res}'
+            'detail': f'{await Users.delete_user(user_id=user_id)}'
         }
-    else:
+    except UserUpdateError:
         raise HTTPException(
             status_code=435,
             detail='deletion error: user not found'

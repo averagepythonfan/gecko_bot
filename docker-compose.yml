@@ -97,6 +97,8 @@ services:
       context: .
       dockerfile: scheduler/Dockerfile
     container_name: scheduler_sync
+    env_file:
+      - .env
     environment:
       MONGO: mongodb
       MLFLOW_CLIENT: mlflow_client

@@ -10,13 +10,12 @@ import aiohttp
 import time
 import os
 import logging
-from pandas.core.frame import DataFrame
-from .misc import redis_aio, validate_user_data, send_pic, make_pic, make_forecast_pic
-from mongodb import users, pairs, other
+from .misc import redis_aio, send_pic, make_pic, make_forecast_pic
+from mongodb import unit_of_work
 from .models import Pair, User
-from pymongo import ReturnDocument, DESCENDING
-from pymongo.results import DeleteResult, InsertOneResult
-from config import EXPERIMENT, TOKEN, MLFLOW_CLIENT, MLFLOW_SERVER
+from pymongo import DESCENDING
+from config import TOKEN, MLFLOW_CLIENT, MLFLOW_SERVER
+from .exc import *
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -28,9 +27,10 @@ class Other:
     It has two static methods: for update and validation pair.'''
 
     @staticmethod
-    async def update():
-        '''Update a pair data from GeckoCoin.
-        Uses from a checking if pair exist.'''
+    async def update() -> bool | None:
+        '''Update a pair data from GeckoCoin like supported_vs_currencies and coins_list.
+        Makes two requests to GeckoCoinAPI.
+        It needs for check if pair {coin_id}-{vs_currency} exists.'''
 
         headers = {
             'accept': 'application/json',
@@ -41,67 +41,75 @@ class Other:
             'coins_list': 'https://api.coingecko.com/api/v3/coins/list'
         }
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                for title, url in data.items():
-                    async with session.get(url, headers=headers) as resp:
-                        response = {'name': title, 'data': await resp.json()}
-                        result = await other.insert_one(response)
-            
-            return result.inserted_id
+        responses = []
 
-        except Exception:
-            return None
+        async with aiohttp.ClientSession() as session:
+
+            for title, url in data.items():
+                async with session.get(url, headers=headers) as resp:
+                    responses.append(
+                        {
+                            'name': title,
+                            'data': await resp.json()
+                        }
+                    )
+
+        for el in responses:
+            async with unit_of_work('other') as uow:
+                resp = await uow.read({'name': el['name']})
+                if resp:
+                    return await uow.update(el)
+                else:
+                    return await uow.create(el)
+
     
     @staticmethod
-    async def pair_existence(pair: Pair) -> dict:
+    async def _pair_existence(pair: Pair) -> dict:
         '''Check if pair exist. Returns status code.
 
         :return: 432 - Wrong vs_currency.
         :return: 433 - Wrong coin.
         :return: 200 - Everything is correct.'''
 
-        vs_currency = await other.find_one(
-            {'name': 'supported_vs_currencies',
-             'data': {
-                '$in': [pair.vs_currency]
+        async with unit_of_work('other') as uow:
+            vs_currency = await uow.find_id({
+                'name': 'supported_vs_currencies',
+                'data': {
+                    '$in': [pair.vs_currency]
                 }
-            }
-        )
-        if vs_currency is None:
-            return {'code': 432, 'detail': 'vs_currency is incorrect'}
+            })
+            coin_id = await uow.find_id({
+                'name': 'coins_list',
+                'data': {
+                    '$elemMatch': {'id': pair.coin_id}
+                }
+            })
 
-        coin = await other.find_one(
-            {'name': 'coins_list',
-            'data': {
-                '$elemMatch':
-                    {'id': pair.coin_id}
-                }
-            }
-        )
-        if coin is None:
-            return {'code': 433, 'detail': 'coin is incorrect'}
+        if vs_currency is None:
+            raise VsCurrencyIncorrect()
+
+        if coin_id is None:
+            raise CoinIdIncorrect()
         
         return {'code': 200, 'detail': 'pair is valid'}
 
     @staticmethod
-    async def pair_in_database(coin_id: str, vs_currency: str, day: int = 7):
+    async def pair_in_database(coin_id: str, vs_currency: str, day: int = 7) -> dict | None:
         '''Return pair data if it exists.
-        Otherwise return 433 response: Pair does not exist.'''
+        Otherwise return None'''
 
         time_slice = -(day * 24)
-        res = await pairs.find_one(
-            {'pair_name': f'{coin_id}-{vs_currency}'},
-                {
-                    'data': {
-                        'prices': {'$slice': time_slice},
-                        'market_caps': {'$slice': 0},
-                        'total_volumes': {'$slice': 0}
-                            }
+
+        async with unit_of_work('other') as uow:
+            query = {'pair_name': f'{coin_id}-{vs_currency}'}
+            projection = {
+                'data': {
+                    'prices': {'$slice': time_slice},
+                    'market_caps': 0,
+                    'total_volumes': 0
                 }
-            )
-        if res:
-            return res
+            }
+            return await uow.read(query=query, projection=projection)
 
     
     @staticmethod
@@ -111,78 +119,76 @@ class Other:
         If all is "True" return pair data.
         Otherwise, returns None.'''
 
-        default = {
-            'user_exist': False,
-            'pair_in_db': False,
-            'pair_in_users_list': False,
-        }
         pair = f'{coin_id}-{vs_currency}'
-        user = await users.find_one({'user_id': user_id})
+
+        async with unit_of_work('users') as uow:
+            user = await uow.read({'user_id': user_id})
+
         if user:
             if pair in user['pairs']:
-                default['pair_in_users_list'] = True
                 pair_in_db = await Other.pair_in_database(
                     coin_id=coin_id,
                     vs_currency=vs_currency,
                     day=day
                 )
                 if pair_in_db:
-                    default['pair_in_db'] = True
-            default['user_exist'] = True
-        
-        if all(default.values()):
-            return pair_in_db
-
+                    return pair_in_db
+                else:
+                    raise PairNotInDataBase()
+            else:
+                raise PairNotInUserList()
+        else:
+            raise UserNotFound()
 
 class Pairs:
     '''CRUD for pairs'''
 
     @staticmethod
-    async def add_pair(pair: Pair):
-        result = await Other.pair_existence(pair=pair)
-        if result != 200:
-            return result
-        else:
-            headers = {
-                'accept': 'application/json',
-            }
+    async def add_pair(pair: Pair) -> bool | None:
+        await Other._pair_existence(pair=pair)
 
-            NOW = int(time.time())
-            THEN = NOW - 60 * 60 * 24 * 89
+        pair_name = f'{pair.coin_id}-{pair.vs_currency}'
 
-            params = {
-                'vs_currency': pair.vs_currency,
-                'from': THEN,
-                'to': NOW,
-            }
+        NOW = int(time.time())
+        THEN = NOW - 60 * 60 * 24 * 89
 
-            async with aiohttp.ClientSession() as session:
+        params = {
+            'vs_currency': pair.vs_currency,
+            'from': THEN,
+            'to': NOW,
+        }
 
-                async with session.get(
-                    f'https://api.coingecko.com/api/v3/coins/{pair.coin_id}/market_chart/range',
-                    params=params,
-                    headers=headers) as resp:
-                        pair_data = await resp.json()
-            
-            res: InsertOneResult = await pairs.insert_one({
-                'pair_name': f'{pair.coin_id}-{pair.vs_currency}',
-                'data': pair_data
-            })
+        async with aiohttp.ClientSession() as session:
 
-            return res.inserted_id
+            async with session.get(
+                f'https://api.coingecko.com/api/v3/coins/{pair.coin_id}/market_chart/range',
+                params=params,
+                headers={'accept': 'application/json'}) as resp:
+                    data = await resp.json()
+        
+        async with unit_of_work('pairs') as uow:
+            if await uow.read({'pair_name': pair_name}, {'_id': 1}):
+                return await uow.update({'$set': {'data': data}})
+            else:
+                return await uow.create({
+                    'pair_name': pair_name,
+                    'data': data
+                })
 
+    # DEPRICATED
     @staticmethod
     async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
         '''Extract data from database.
         
         If it exists, return a JSON data,
-        otherwise return 433 response: Pair does not exist.'''
+        otherwise return None response: Pair does not exist.'''
 
         result = await Other.pair_in_database(coin_id=coin_id, vs_currency=vs_currency, day=day)
-        if result == 433:
-            return result
-        else:
+        if result:
             return result['data']['prices']
+        else:
+            raise PairNotInDataBase()
+
 
     @staticmethod
     async def get_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
@@ -199,58 +205,47 @@ class Pairs:
         :return: 434 - user does not exist
         :return: 437 - pair not found in user's list.'''
 
-        user = await users.find_one({'user_id': user_id})
-        if user:
-            pair = f'{coin_id}-{vs_currency}'
-            if pair in user['pairs']:
-                # check if exist in cache
-                async with redis_aio() as redis:
-                    value = await redis.get(f'{pair} {day}')
-                    if value:
-                        value: bytes
-                        url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
-                        params = {
-                            'chat_id': int(user_id),
-                            'photo': value.decode("utf-8")
-                        }
-                        resp = await send_pic(url=url, params=params)
-                        return {'code': 200, 'detail': resp }
-                
-                check_pair = await Other.pair_in_database(
-                    coin_id=coin_id,
-                    vs_currency=vs_currency,
-                    day=day
-                )
-                if check_pair != 433:
-                    prices = check_pair['data']['prices']
+        pair = f'{coin_id}-{vs_currency}'
+        pair_data = await Other.checker(
+            user_id=user_id,
+            coin_id=coin_id,
+            vs_currency=vs_currency,
+            day=day)
 
-                    file_name = make_pic(
-                        prices=prices,
-                        pair=pair,
-                        user_id=user_id,
-                        day=day
-                    )
+        # check if exist in cache
+        async with redis_aio() as redis:
+            value = await redis.get(f'{pair} {day}')
+            if value:
+                value: bytes
+                url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
+                params = {
+                    'chat_id': int(user_id),
+                    'photo': value.decode("utf-8")
+                }
+                resp = await send_pic(url=url, params=params)
+                return {'code': 200, 'detail': resp }
 
-                    response = await send_pic(
-                        url=f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}',
-                        file_name=file_name
-                    )
-                    os.remove(file_name)
+        file_name = make_pic(
+            prices=pair_data['data']['prices'],
+            pair=pair,
+            user_id=user_id,
+            day=day
+        )
 
-                    async with redis_aio() as redis:
-                        await redis.set(
-                            name=f'{pair} {day}',
-                            value=response['result']['photo'][-1]['file_id'],
-                            ex=600
-                        )
+        response = await send_pic(
+            url=f'https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={user_id}',
+            file_name=file_name
+        )
+        os.remove(file_name)
 
-                    return {'code': 200, 'detail': response }
-                else:
-                    return {'code': 433, 'detail': 'pair incorrect'}
-            else:
-                return {'code': 437, 'detail': 'pair not found in user pair list'}
-        else:
-            return {'code': 434, 'detail': 'user not found'}
+        async with redis_aio() as redis:
+            await redis.set(
+                name=f'{pair} {day}',
+                value=response['result']['photo'][-1]['file_id'],
+                ex=600
+            )
+
+        return True
 
 
     @staticmethod
@@ -262,113 +257,111 @@ class Users:
     '''CRUD pattern for users.'''
 
     @staticmethod
-    async def create_user(user: User):
+    async def create_user(user: User) -> bool:
         '''Creates a new user, if it does not exist.
         
         :return: True - user successfully created
         :return: None - user alredy exists.'''
 
-        res = await users.find_one({'user_id': user.user_id})
-        if res:
-            return None
-        else:
-            user_data = {
-                'user_id': user.user_id,
-                'user_name': user.user_name,
-                'n_pairs': user.n_pairs,
-                'pairs': []
-            }
-            result: InsertOneResult = await users.insert_one(user_data)
-            return result.acknowledged
+        async with unit_of_work('users') as uow:
+            if await uow.find_id({'user_id': user.user_id}) is None:
+                user_data = {
+                    'user_id': user.user_id,
+                    'user_name': user.user_name,
+                    'n_pairs': user.n_pairs,
+                    'pairs': []
+                }
+                if await uow.create(query=user_data):
+                    return True
+                else:
+                    raise UserCreationError()
+            else:
+                raise UserAlreadyExist()
+
 
     @staticmethod
     async def get_all_users():
         '''Return all users data'''
 
-        _users = []
-        cur = users.find().sort('user_id', DESCENDING)
-        docs = await cur.to_list(None)
-        for el in docs:
-            _users.append(validate_user_data(el))
-        return _users
+        async with unit_of_work('users') as uow:
+            cur =  uow.collection.find({}, {'_id': 0}).sort('user_id', DESCENDING)
+            docs = await cur.to_list(None)
+            return docs
+
 
     @staticmethod
-    async def get_user(user_id: int):
+    async def get_user(user_id: int) -> dict:
         '''Get user data by user_id'''
 
-        res = await users.find_one({'user_id': user_id})
-        if res:
-            return validate_user_data(res)
+        async with unit_of_work('users') as uow:
+            user = await uow.find_id({'user_id': user_id}, {'_id': 0})
+        if user:
+            return user
+        else:
+            raise UserNotFound()
+
 
     @staticmethod
-    async def set_n_pairs(user_id: int, n_pairs: int = 3):
+    async def set_n_pairs(user_id: int, n_pairs: int = 3) -> bool:
         '''Set count of available pair fot selected user (user_id)'''
 
-        res = await users.find_one_and_update(
-            {'user_id': user_id},
-            {'$set': {'n_pairs': n_pairs}},
-            return_document=ReturnDocument.AFTER
-        )
+        async with unit_of_work('users') as uow:
+            res = await uow.update(
+                query={'$set': {'n_pairs': n_pairs}},
+                filter_={'user_id': user_id}
+                )
         if res:
-            return validate_user_data(res)
+            return res
+        else:
+            raise UserUpdateError()
+
 
     @staticmethod
     async def add_pair(user_id: int, pair: Pair):
-        data = {
-            'code': 200,
-            'detail': 'pair successfully added'
-        }
+        '''Add pair to users list.'''
 
-        check_user = await users.find_one({'user_id': user_id})
-        check_pair = await Other.pair_existence(pair=pair)
+        await Other._pair_existence(pair=pair)
 
-        if (check_user and check_pair['code'] == 200):
-            user_validated = validate_user_data(check_user)
-            if user_validated['n_pairs'] > len(user_validated['pairs']):
-                res = await users.find_one_and_update(
-                    {'user_id': user_id},
-                    {'$push': {'pairs': f'{pair.coin_id}-{pair.vs_currency}'}},
-                    return_document=ReturnDocument.AFTER
-                )
-                user_updated = validate_user_data(res)
-                data['detail'] = {
-                    'message': 'user and pair successfully validated and added',           
-                    'data': user_updated,
-                    'n_user_pairs': len(user_updated['pairs']),
-                    'n_pairs_left': user_updated['n_pairs'] - len(user_updated['pairs'])
-                }
+        async with unit_of_work('users') as uow:
+            user = await uow.read({'user_id': user_id}, {'_id': 0})
+            if user:
+                if user['n_pairs'] > len(user['pairs']):
+                    pair_name = f'{pair.coin_id}-{pair.vs_currency}'
+                    if await uow.update(
+                        {'$push': {'pairs': pair_name}}
+                    ):
+                        return True
+                    else:
+                        raise UserUpdateError()
+                else:
+                    raise PairListIsOver()
             else:
-                data['code'] = 439
-                data['detail'] = 'Pair limit is over'
-        elif check_pair != 200:
-            data['code'] = check_pair['code']
-            data['detail'] = check_pair['detail']
-        elif check_user is None:
-            data['code'] = 435
-            data['detail'] = 'user not found'
-        return data
+                raise UserNotFound()
+
 
     @staticmethod
     async def delete_users_pair(user_id: int, pair: str):
-        data = {
-            'code': 200,
-            'detail': 'pair successfully deleted'
-        }
+        '''Delete pair from pair list'''
 
-        res = await users.find_one_and_update(
-            {'user_id': user_id},
-            {'$pull': {'pairs': pair}}
-        )
-        if res is None:
-            data['code'] = 437
-            data['detail'] = 'pair not found'
-        
-        return data
+        async with unit_of_work('users') as uow:
+            if await uow.update(
+                query={'$pull': {'pairs': pair}},
+                filter_={'user_id': user_id}
+            ):
+                return True
+            else:
+                raise UserUpdateError()
+
 
     @staticmethod
     async def delete_user(user_id: int):
-        res: DeleteResult = await users.delete_one({'user_id': user_id})
-        return res.raw_result
+        '''Delete user by user_id'''
+
+        async with unit_of_work('users') as uow:
+            if await uow.delete({'user_id': user_id}):
+                return True
+            else:
+                raise UserUpdateError()
 
 
 class Models:
@@ -386,6 +379,8 @@ class Models:
                                     params=params) as resp:
                 if resp.status == 200:
                     return await resp.json()
+                else:
+                    raise MlflowClientError('Run failed')
 
     @staticmethod
     async def get_model_uri(pair: str, model: str = 'prophet-model') -> dict | None:
@@ -424,6 +419,11 @@ class Models:
                                 'model_uri' : model_uri,
                                 'last_data': last_data.pop()
                             }
+                        else:
+                            raise ModelURINotFound('Model uri not found')
+                else:
+                    raise MlflowServerError('REST API error')
+
 
     @staticmethod
     async def forecast(day: int, model_uri: str, last_data: str):
@@ -449,6 +449,9 @@ class Models:
                 headers=headers) as resp:
                 if resp.status == 200:
                     return await resp.json()
+                else:
+                    raise MlflowClientError('Predict failed')
+
     
     @staticmethod
     async def send_forecast_pic(user_id: int, pair: Pair, forecast: str, day_before: int = 12):
@@ -456,14 +459,14 @@ class Models:
         
         Send it by Telegram Bot API.'''
 
-        res = await Other.checker(
+        pair_data = await Other.checker(
             user_id=user_id,
             coin_id=pair.coin_id,
             vs_currency=pair.vs_currency,
             day=day_before
         )
 
-        if res:
+        if pair_data:
             async with redis_aio() as redis:
                 value = await redis.get(f'{pair.coin_id}-{pair.vs_currency} forecast for {day_before}')
                 if value:
@@ -475,8 +478,9 @@ class Models:
                     }
                     resp = await send_pic(url=url, params=params)
                     return {'code': 200, 'detail': resp }
+
             file_name = make_forecast_pic(
-                prices=res['data']['prices'],
+                prices=pair_data['data']['prices'],
                 forecast=forecast,
                 user_id=user_id,
                 pair=f"{pair.coin_id}-{pair.vs_currency}",

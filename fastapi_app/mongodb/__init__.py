@@ -1,1 +1,1 @@
-from .mongodb import users, pairs, other
+from .mongodb import *
