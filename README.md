@@ -1,18 +1,23 @@
 # Gecko Coin Bot
 
-A Telegram Bot which is working with (Gecko Coin API)[https://www.coingecko.com/ru/api/documentation].
+A Telegram Bot which is working with [Gecko Coin API](https://www.coingecko.com/ru/api/documentation).
 This is a pet-project for my portfolio that created to show my programming skills:
 - designing RESTfull API service with FastAPI
-- simple and readable Python code
+- simple and readable Python code (flake8)
 - designing microservice architecture with Docker and Docker-Compose
 - working with NoSQL databases as MongoDB
 - testing code with PyTest
+- ML-model workflow with Mlflow
 
-Whole project contains 4 services:
+Whole project contains 6 services:
 1. Telegram Bot in Aiogram 3
-2. Backend with FastAPI
+2. Backend with FastAPI + nginx
 3. MongoDB
-4. mlflow server to working with ml-models
+4. Redis
+5. Mlflow client + Mlflow server to working with ml-models
+6. Scheduler
+
+
 
 Tree:
 ```
