@@ -88,10 +88,10 @@ class PairTask:
             time.sleep(10)
 
     @staticmethod
-    def on_failure():
+    def admin_notification(result: str):
         params = {
             'chat_id': ADMIN,
-            'text': f'Updating pairs fail at {datetime.now()}'
+            'text': f'Update pairs {result} at {datetime.now()}'
         }
 
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"

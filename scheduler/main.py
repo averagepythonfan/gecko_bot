@@ -7,8 +7,9 @@ def pair_job():
     p = PairTask()
     try:
         p.update_data()
+        PairTask.admin_notification('successfully')
     except GeckoCoinAPIException:
-        PairTask.on_failure()
+        PairTask.admin_notification('fail')
 
 
 def model_job():

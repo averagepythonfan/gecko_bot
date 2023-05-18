@@ -27,6 +27,7 @@ services:
       REDIS: redisdb
       MLFLOW_CLIENT: mlflow_client
       MLFLOW_SERVER: mlflow_server
+      DATABASE: ${DATABASE}
     volumes:
       - ./fastapi_app:/app
     depends_on:
