@@ -7,7 +7,7 @@ class Client:
     @staticmethod
     async def get(entity: str,
                   path: str,
-                  headers: dict = {'accept': 'application/json',},
+                  headers: dict = {'accept': 'application/json'},
                   params: dict = {}) -> dict:
         '''GET method: no body allowed.
         Return a json.'''
@@ -20,12 +20,12 @@ class Client:
             ) as resp:
                 response = await resp.json()
         return response
-    
+
     @staticmethod
     async def put(entity: str,
                   path: str,
                   headers: dict = {'accept': 'application/json',
-                                   'Content-Type': 'application/json',},
+                                   'Content-Type': 'application/json'},
                   json_data: dict = {}) -> dict:
         '''PUT method: only for users'''
 
@@ -37,12 +37,12 @@ class Client:
             ) as resp:
                 response = await resp.json()
         return response
-    
+
     @staticmethod
     async def post(entity: str,
                    path: str,
                    headers: dict = {'accept': 'application/json',
-                                    'Content-Type': 'application/json',},
+                                    'Content-Type': 'application/json'},
                    params: dict = {},
                    json_data: dict = {}) -> dict:
         '''POST mothod: all types'''
@@ -61,7 +61,7 @@ class Client:
     @staticmethod
     async def delete(entity: str,
                      path: str,
-                     headers: dict = {'accept': 'application/json',},
+                     headers: dict = {'accept': 'application/json'},
                      json_data: dict = {}) -> dict:
         '''DELETE method: only for users'''
 

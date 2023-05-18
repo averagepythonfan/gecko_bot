@@ -5,10 +5,9 @@ import aioredis
 from pydantic import BaseModel
 from typing import List
 import pandas as pd
-from pandas.core.frame import DataFrame
 import matplotlib.pyplot as plt
 import seaborn as sns
-from config import REDIS, TOKEN
+from config import REDIS
 
 
 sns.set_theme(style="darkgrid")
@@ -33,7 +32,7 @@ def validate_user_data(input_data):
 
 async def send_pic(url: int, file_name: str | None = None, params: dict | None = None) -> dict:
     '''Send pic to user by POST HTTP-request to Telegram API.
-    
+
     Return a JSON with response from Telegram server.
 
     Parameters
@@ -52,9 +51,9 @@ async def send_pic(url: int, file_name: str | None = None, params: dict | None =
                     return response
     else:
         async with aiohttp.ClientSession() as session:
-                async with session.post(url=url, params=params) as resp:
-                    response = await resp.json()
-                    return response
+            async with session.post(url=url, params=params) as resp:
+                response = await resp.json()
+                return response
 
 
 def make_pic(prices: list, pair: str, user_id: int, day: int):
@@ -75,7 +74,7 @@ def make_pic(prices: list, pair: str, user_id: int, day: int):
     df = pd.DataFrame(prices, columns=['ds', 'y'])
     df.ds = pd.to_datetime(df.ds // 1000, unit='s')
 
-    plt.figure(figsize=(13,6), dpi=80)
+    plt.figure(figsize=(13, 6), dpi=80)
     plot = sns.lineplot(data=df, x=df.ds, y=df.y, label=f'{pair}')
     plot.set(
         title=pair,
@@ -95,10 +94,9 @@ def make_forecast_pic(
         forecast: str,
         user_id: int,
         pair: str,
-        day_before: int = 12
-    ) -> str:
+        day_before: int = 12) -> str:
     '''Makes a pic with forecast data.
-    
+
     Return a file name (format: '{user_id}-{int(time.time())}.jpeg').'''
 
     df = pd.DataFrame(prices, columns=['ds', 'y'])
@@ -109,12 +107,12 @@ def make_forecast_pic(
 
     treshold = -(24 * day_before)
     target_list = ['yhat_upper', 'yhat_lower', 'yhat']
-    
-    plt.figure(figsize=(17,8), dpi=80)
+
+    plt.figure(figsize=(17, 8), dpi=80)
     plot = sns.lineplot(data=df, x=df.ds[treshold:], y=df.y[treshold:], label='data')
     for target in target_list:
         diff = df.y.iloc[-1] - forecast[target].iloc[0]
-        sns.lineplot(data=forecast, x=forecast.ds, y=forecast[target]+diff, label=target)
+        sns.lineplot(data=forecast, x=forecast.ds, y=forecast[target] + diff, label=target)
     plot.set(xlabel=f'Last {-treshold//24} days', ylabel='Closing Price')
     plot.set_title(pair)
     plot.legend(loc=0)

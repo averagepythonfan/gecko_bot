@@ -14,6 +14,7 @@ def get_client() -> MlflowClient:
     yield client
     del client
 
+
 def single_run(df: DataFrame, experiment_id: str) -> dict:
     '''Create a single run. Return a dict with response.'''
     time_now = int(time.time())
@@ -28,15 +29,15 @@ def single_run(df: DataFrame, experiment_id: str) -> dict:
         m.fit(df)
 
         model_params = {
-                name: value for name, value in vars(m).items() if np.isscalar(value)
+            name: value for name, value in vars(m).items() if np.isscalar(value)
         }
         mlflow.log_params(model_params)
         mlflow.log_param('last_day', str(df.ds.iloc[-1] + DateOffset(hours=1)))
 
         cv_results = cross_validation(
-                m, initial='1800 hours', period='60 hours', horizon='120 hours'
-            )
-            
+            m, initial='1800 hours', period='60 hours', horizon='120 hours'
+        )
+
         cv_metrics = ["mse", "rmse", "mape"]
         metrics_results = performance_metrics(cv_results, metrics=cv_metrics)
         average_metrics = metrics_results.loc[:, cv_metrics].mean(axis=0).to_dict()

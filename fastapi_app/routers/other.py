@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from models import Other, Pair
+from fastapi import APIRouter
+from models import Other
 
 
 router = APIRouter(
@@ -11,7 +11,7 @@ router = APIRouter(
 @router.get('/update')
 async def update_other():
     '''Update supported vs_currencies and coins list.
-        
+
     :return: 200, successfull update,
     :return: 438, data update error'''
 

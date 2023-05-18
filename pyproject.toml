@@ -29,6 +29,7 @@ aiogram = "3.0.0b7"
 [tool.poetry.group.dev.dependencies]
 setuptools = "^67.7.2"
 httpx = "^0.24.0"
+flake8 = "^6.0.0"
 
 
 [tool.poetry.group.mlflow_client.dependencies]

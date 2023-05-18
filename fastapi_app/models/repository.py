@@ -15,7 +15,10 @@ from mongodb import unit_of_work
 from .models import Pair, User
 from pymongo import DESCENDING
 from config import TOKEN, MLFLOW_CLIENT, MLFLOW_SERVER
-from .exc import *
+from .exc import (UserNotFound, UserAlreadyExist, UserUpdateError,
+                  UserCreationError, VsCurrencyIncorrect, CoinIdIncorrect,
+                  PairListIsOver, PairNotInDataBase, PairNotInUserList,
+                  MlflowClientError, MlflowServerError, ModelURINotFound)
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -40,7 +43,7 @@ class Other:
             'supported_vs_currencies': 'https://api.coingecko.com/api/v3/simple/supported_vs_currencies',
             'coins_list': 'https://api.coingecko.com/api/v3/coins/list'
         }
-        
+
         responses = []
 
         async with aiohttp.ClientSession() as session:
@@ -62,7 +65,6 @@ class Other:
                 else:
                     await uow.create(el)
 
-    
     @staticmethod
     async def _pair_existence(pair: Pair) -> dict:
         '''Check if pair exist. Returns status code.
@@ -90,7 +92,7 @@ class Other:
 
         if coin_id is None:
             raise CoinIdIncorrect()
-        
+
         return {'code': 200, 'detail': 'pair is valid'}
 
     @staticmethod
@@ -111,11 +113,10 @@ class Other:
             }
             return await uow.find_id(query=query, projection=projection)
 
-    
     @staticmethod
     async def checker(user_id: int, coin_id: str, vs_currency: str, day: int) -> dict | None:
         '''Check if user exist, pair exist in user's list and database.
-        
+
         If all is "True" return pair data.
         Otherwise, returns None.'''
 
@@ -140,6 +141,7 @@ class Other:
         else:
             raise UserNotFound()
 
+
 class Pairs:
     '''CRUD for pairs'''
 
@@ -161,11 +163,11 @@ class Pairs:
         async with aiohttp.ClientSession() as session:
 
             async with session.get(
-                f'https://api.coingecko.com/api/v3/coins/{pair.coin_id}/market_chart/range',
-                params=params,
-                headers={'accept': 'application/json'}) as resp:
-                    data = await resp.json()
-        
+                    f'https://api.coingecko.com/api/v3/coins/{pair.coin_id}/market_chart/range',
+                    params=params,
+                    headers={'accept': 'application/json'}) as resp:
+                data = await resp.json()
+
         async with unit_of_work('pairs') as uow:
             if await uow.read({'pair_name': pair_name}, {'_id': 1}):
                 return await uow.update({'$set': {'data': data}})
@@ -179,7 +181,7 @@ class Pairs:
     @staticmethod
     async def get_pair(coin_id: str, vs_currency: str, day: int = 7):
         '''Extract data from database.
-        
+
         If it exists, return a JSON data,
         otherwise return None response: Pair does not exist.'''
 
@@ -189,17 +191,16 @@ class Pairs:
         else:
             raise PairNotInDataBase()
 
-
     @staticmethod
     async def get_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
         '''Send pic to user.
-        
+
         Do a POST HTTP-request to Telegram server.
         If any user makes a request it create a pic with data exchanges
         then cache "file_id" and request for 10 min.
         If cache is empty or key is does not exist,
         it creates a new picture.
-        
+
         :return: 200 - JSON response
         :return: 433 - pair is incorrect
         :return: 434 - user does not exist
@@ -223,7 +224,7 @@ class Pairs:
                     'photo': value.decode("utf-8")
                 }
                 resp = await send_pic(url=url, params=params)
-                return {'code': 200, 'detail': resp }
+                return {'code': 200, 'detail': resp}
 
         file_name = make_pic(
             prices=pair_data['data']['prices'],
@@ -247,7 +248,6 @@ class Pairs:
 
         return True
 
-
     @staticmethod
     async def delete_pair(pair: Pair):
         pass
@@ -259,7 +259,7 @@ class Users:
     @staticmethod
     async def create_user(user: User) -> bool:
         '''Creates a new user, if it does not exist.
-        
+
         :return: True - user successfully created
         :return: None - user alredy exists.'''
 
@@ -278,16 +278,14 @@ class Users:
             else:
                 raise UserAlreadyExist()
 
-
     @staticmethod
     async def get_all_users():
         '''Return all users data'''
 
         async with unit_of_work('users') as uow:
-            cur =  uow.collection.find({}, {'_id': 0}).sort('user_id', DESCENDING)
+            cur = uow.collection.find({}, {'_id': 0}).sort('user_id', DESCENDING)
             docs = await cur.to_list(None)
             return docs
-
 
     @staticmethod
     async def get_user(user_id: int) -> dict:
@@ -300,7 +298,6 @@ class Users:
         else:
             raise UserNotFound()
 
-
     @staticmethod
     async def set_n_pairs(user_id: int, n_pairs: int = 3) -> bool:
         '''Set count of available pair fot selected user (user_id)'''
@@ -309,12 +306,11 @@ class Users:
             res = await uow.update(
                 query={'$set': {'n_pairs': n_pairs}},
                 filter_={'user_id': user_id}
-                )
+            )
         if res:
             return res
         else:
             raise UserUpdateError()
-
 
     @staticmethod
     async def add_pair(user_id: int, pair: Pair):
@@ -338,7 +334,6 @@ class Users:
             else:
                 raise UserNotFound()
 
-
     @staticmethod
     async def delete_users_pair(user_id: int, pair: str):
         '''Delete pair from pair list'''
@@ -351,7 +346,6 @@ class Users:
                 return True
             else:
                 raise UserUpdateError()
-
 
     @staticmethod
     async def delete_user(user_id: int):
@@ -385,7 +379,7 @@ class Models:
     @staticmethod
     async def get_model_uri(pair: str, model: str = 'prophet-model') -> dict | None:
         '''Class method return a dict with model_uri and last_day.
-        
+
         If any exception raise then return None.
         Format:
         {
@@ -416,14 +410,13 @@ class Models:
                                 el['value'] for el in runs['runs'][0]['data']['params'] if el['key'] == 'last_day'
                             ]
                             return {
-                                'model_uri' : model_uri,
+                                'model_uri': model_uri,
                                 'last_data': last_data.pop()
                             }
                         else:
                             raise ModelURINotFound('Model uri not found')
                 else:
                     raise MlflowServerError('REST API error')
-
 
     @staticmethod
     async def forecast(day: int, model_uri: str, last_data: str):
@@ -444,19 +437,18 @@ class Models:
             }
 
             async with session.post(
-                f'http://{MLFLOW_CLIENT}/prophet/predict',
-                params=params,
-                headers=headers) as resp:
+                    f'http://{MLFLOW_CLIENT}/prophet/predict',
+                    params=params,
+                    headers=headers) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 else:
                     raise MlflowClientError('Predict failed')
 
-    
     @staticmethod
     async def send_forecast_pic(user_id: int, pair: Pair, forecast: str, day_before: int = 12):
         '''Makes a picture with forecast for user.
-        
+
         Send it by Telegram Bot API.'''
 
         pair_data = await Other.checker(
@@ -468,7 +460,8 @@ class Models:
 
         if pair_data:
             async with redis_aio() as redis:
-                value = await redis.get(f'{pair.coin_id}-{pair.vs_currency} forecast for {day_before}')
+                pair_name = f'{pair.coin_id}-{pair.vs_currency}'
+                value = await redis.get(f'{pair_name} forecast for {day_before}')
                 if value:
                     value: bytes
                     url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
@@ -477,7 +470,7 @@ class Models:
                         'photo': value.decode("utf-8")
                     }
                     resp = await send_pic(url=url, params=params)
-                    return {'code': 200, 'detail': resp }
+                    return {'code': 200, 'detail': resp}
 
             file_name = make_forecast_pic(
                 prices=pair_data['data']['prices'],
@@ -500,4 +493,4 @@ class Models:
                     ex=600
                 )
 
-            return {'code': 200, 'detail': response }
+            return {'code': 200, 'detail': response}

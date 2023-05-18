@@ -24,10 +24,10 @@ def create_prophet_run(coin_id: str, vs_currency: str, client: MlflowClient = De
     If experiment does not exist, create a new one.
     Then create a run, save metadata and fitted model.
     Return
-    
+
     Parameters
     ----------
-    
+
     coin_id:
         coin id, must be string.
         for example: bitcoin, ethereum, etc.
@@ -35,7 +35,7 @@ def create_prophet_run(coin_id: str, vs_currency: str, client: MlflowClient = De
         mast be string, examples: usd, rub, eth
     client:
         mlflow client to work with mlflow API.
-        
+
     Return a dict with format:
         :return:code: 200 - successful run
         :return:code: 433 - failed run'''
@@ -43,7 +43,7 @@ def create_prophet_run(coin_id: str, vs_currency: str, client: MlflowClient = De
     EXPERIMENT = f'{coin_id}-{vs_currency}'
 
     headers = {
-    'accept': 'application/json',
+        'accept': 'application/json',
     }
 
     params = {
@@ -86,10 +86,10 @@ def create_prophet_run(coin_id: str, vs_currency: str, client: MlflowClient = De
 @router.post('/predict')
 def predict_prophet(day: int, model_uri: str, last_data: str):
     '''Forecast for {day}
-    
+
     Parameters
     ----------
-    
+
     day:
         integer value, recomended 1-7 days
     model:
@@ -103,7 +103,7 @@ def predict_prophet(day: int, model_uri: str, last_data: str):
     try:
         loaded_model = mlflow.pyfunc.load_model(model_uri)
 
-        test_dates = pd.date_range(start=last_data, periods=24*day, freq="H")
+        test_dates = pd.date_range(start=last_data, periods=24 * day, freq="H")
         test_df = pd.Series(data=test_dates.values, name="ds").to_frame()
 
         preds = loaded_model.predict(test_df)

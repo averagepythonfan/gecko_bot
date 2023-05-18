@@ -118,7 +118,7 @@ async def my_status_command(message: types.Message):
 
 async def show_exchanges_command(message: types.Message, command: CommandObject):
     '''Send pic with exchanges to user.
-    
+
     Default days = 7'''
 
     if command.args:
@@ -143,6 +143,7 @@ async def show_exchanges_command(message: types.Message, command: CommandObject)
                 }
             )
 
+
 async def prophet_forecast(message: types.Message, command: CommandObject):
     '''Forecasting for {days} by prophet model.'''
 
@@ -150,8 +151,6 @@ async def prophet_forecast(message: types.Message, command: CommandObject):
         text = command.args.split()
         COIN_ID, VS_CURRENCY = text[0].split('-')
         DAY_FORECAST = text[1]
-
-
 
         headers = {
             'accept': 'application/json',
@@ -169,7 +168,6 @@ async def prophet_forecast(message: types.Message, command: CommandObject):
             'vs_currency': VS_CURRENCY,
         }
 
-
         res = await Client.post(
             entity=Entity.pair.value,
             path='/forecast',
@@ -179,8 +177,7 @@ async def prophet_forecast(message: types.Message, command: CommandObject):
         )
 
         if res is None:
-            await message.reply(f'Your model is not ready now. It is preparing')
-
+            await message.reply('Your model is not ready now. It is preparing')
 
 
 def register_message_handlers(router: Router) -> None:

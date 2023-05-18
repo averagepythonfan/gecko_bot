@@ -5,6 +5,7 @@ from models import (CoinIdIncorrect, VsCurrencyIncorrect,
                     PairNotInUserList, MlflowServerError,
                     MlflowClientError, ModelURINotFound)
 
+
 router = APIRouter(
     prefix='/pair',
     tags=['Pairs']
@@ -14,7 +15,7 @@ router = APIRouter(
 @router.post('/add_pair')
 async def add_pair(pair: Pair):
     '''Add pair to database.
-    
+
     :return: 200, pair successfully added,
     :return: 432, vs_currency not valid: {vs_currency},
     :return: 433, coin not valid: {pair.coin_id}'''
@@ -38,7 +39,7 @@ async def add_pair(pair: Pair):
 @router.get('/send_pic')
 async def send_pic(user_id: int, coin_id: str, vs_currency: str, day: int = 7):
     '''Send pic to user by POST request to Telegram Bot API.'''
-    
+
     try:
         res = await Pairs.get_pic(
             user_id=user_id,
@@ -109,8 +110,7 @@ async def forecast_prophet(day: int, user_id: int, pair: Pair, model: str = 'pro
             user_id=user_id,
             pair=pair,
             forecast=forecast['predictions'],
-            day_before=day*3
-
+            day_before=day * 3
         )
         return {
             'status': 'success',

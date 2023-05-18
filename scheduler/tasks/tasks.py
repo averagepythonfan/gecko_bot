@@ -23,7 +23,7 @@ class GeckoCoinAPIException(BaseException):
 
 
 class PairTask:
-    
+
     def __init__(self,
                  address: str = MONGO,
                  port: int = 27017,
@@ -40,15 +40,14 @@ class PairTask:
         self._pairs_insert = set()
         for el in self.users.find({'pairs': {'$ne': []}}):
             self._pairs_insert = self._pairs_insert.union(set(el['pairs']) - self._pairs_update)
-            
 
     @staticmethod
     def _request(pair: str) -> dict:
         '''Make request to GeckoCoinAPI to get data'''
 
         coin_id, vs_currency = pair.split('-')
-            
-        headers = {'accept': 'application/json',}
+
+        headers = {'accept': 'application/json'}
 
         NOW = int(time.time())
         THEN = NOW - 60 * 60 * 24 * 89
@@ -68,7 +67,7 @@ class PairTask:
             return pair_data
         else:
             raise GeckoCoinAPIException('Pair data update fail')
-    
+
     def update_data(self) -> None:
         print('Start updating')
         for el in self._pairs_update:
@@ -77,7 +76,7 @@ class PairTask:
                 {'$set': {'data': self._request(el)}}
             )
             logger.info(f'Pair {el} updated, ID: {res.upserted_id}')
-            logger.debug('Wait for 10 seconds') # replace to logging
+            logger.debug('Wait for 10 seconds')
             time.sleep(10)
         for el in self._pairs_insert:
             res = self.pairs.insert_one({
@@ -85,9 +84,9 @@ class PairTask:
                 'data': self._request(el)
             })
             logger.info(f'Pair {el} inserted, ID: {res.inserted_id}')
-            logger.debug('Wait for 10 seconds') # replace to logging
+            logger.debug('Wait for 10 seconds')
             time.sleep(10)
-    
+
     @staticmethod
     def on_failure():
         params = {
@@ -100,7 +99,7 @@ class PairTask:
 
 
 class ModelTask:
-    
+
     def __init__(self, mlflow_server: str = MLFLOW_SERVER, mlflow_client: str = MLFLOW_CLIENT) -> None:
         '''Get all experiment names and do new runs'''
 
@@ -109,12 +108,12 @@ class ModelTask:
         resp = requests.post(
             f'http://{self.mlflow_server}:5000/api/2.0/mlflow/experiments/search',
             json={'max_results': 100},
-            headers={'accept': 'application/json',}
+            headers={'accept': 'application/json'}
         )
         if resp.status_code == 200:
             resp = resp.json()
             self.exp = {el['name'] for el in resp['experiments']}
-    
+
     def do_runs(self) -> None:
         for el in self.exp:
             COIN_ID, VS_CURRENCY = el.split('-')
