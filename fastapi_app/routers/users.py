@@ -31,7 +31,7 @@ async def create_user(user: User):
         )
     except UserCreationError:
         raise HTTPException(
-            status_code=434,
+            status_code=435,
             detail='User creation error'
         )
 
